@@ -27,7 +27,7 @@ function collocation_matrix(NCP, Poly)
             Pdot = [   -2.0   1.5   0.499999		
                         2.0  -4.5   2.5		]
 
-            P = [-4.44E-16  0   1] 
+            P = [0  0   1] 
 
         elseif NCP == 4
             #t[k,1] = [0, 0.155051, 0.644949, 1]

@@ -66,37 +66,37 @@ const R     = 8.314     # J/mol K
 const V_a   = L_a*(π*(D_a/2)^2 - π*(D_w/2)^2) 
 
 
-##* OCP Parameters
+#* OCP Parameters
 T0  =  0.0
-Tf  =  30
-dt  =  1
-NFE =  30
+Tf  =  30.0
+dt  =  1000
+NFE =  2
 NCP =  3
 
 Nx = 3
 Nu = 1
 Nz = 12
 
-x0 = [1.32, 0.8, 6.0]
+x0 = [1.32; 0.8; 6.0]   #initial state 
 
-##
+#
     ##* Defining Solver
     model1 = Model(with_optimizer(Ipopt.Optimizer))
 
     #region-> #*Define Variables and Objective
 
         #region-> Defining all variables
-            ## Declare Variables
+            ## Declare general OCP Variables
             @variable(model1, x[1:Nx, 1:NFE, 1:NCP])
-            @variable(model1, z[1:Nz, 1:NFE, 1:NCP])
-            @variable(model1, u[1:Nu, 1:NFE])
+            # @variable(model1, z[1:Nz, 1:NFE, 1:NCP])
+            # @variable(model1, u[1:Nu, 1:NFE])
                                 
             #unscaled variables
             # @variable(model1, q[    1:1,        1:NFE, 1:NCP])
             @variable(model1, dx_us[1:Nx,       1:NFE, 1:NCP])
             # @variable(model1, dq[   1:1,        1:NFE, 1:NCP])
 
-            #Auxiliary Variables
+            #Auxiliary Variables - For writing model Equations
                 @variables(model1, begin
                 #Differential Variables
                     mass_ga[nfe in 1:NFE, ncp in 1:NCP]      # mass of gas in annulus
@@ -109,6 +109,7 @@ x0 = [1.32, 0.8, 6.0]
 
                     rho_ai[nfe in 1:NFE, ncp in 1:NCP] 
                     rho_m[nfe  in 1:NFE, ncp in 1:NCP]  
+                    
                     w_pc[nfe   in 1:NFE, ncp in 1:NCP]   # total flow through choke
                     w_pg[nfe   in 1:NFE, ncp in 1:NCP]   # produced gas rate
                     w_po[nfe   in 1:NFE, ncp in 1:NCP]   
@@ -116,16 +117,16 @@ x0 = [1.32, 0.8, 6.0]
                     # pressure at well injection point
                     p_wi[nfe in 1:NFE, ncp in 1:NCP]   
                     p_bh[nfe in 1:NFE, ncp in 1:NCP]   
+                    
                     w_iv[nfe in 1:NFE, ncp in 1:NCP]   
                     w_ro[nfe in 1:NFE, ncp in 1:NCP]   
                     w_rg[nfe in 1:NFE, ncp in 1:NCP]   
 
                 # Manipulated Inputs
                     w_gl[nfe in 1:NFE] 
-
             end)
 
-            #region-> Mapping the auxilliary variables to vectors
+            #region-> Mapping the auxilliary variables to general OCP variable vectors
                 @constraints(model1, begin
                     #Differential states
                         [nfe in 1:NFE, ncp in 1:NCP],    mass_ga[nfe, ncp]   == x[1,nfe,ncp]     # mass of gas in annulus
@@ -133,37 +134,39 @@ x0 = [1.32, 0.8, 6.0]
                         [nfe in 1:NFE, ncp in 1:NCP],    mass_ot[nfe, ncp]   == x[3,nfe,ncp]     # mass of oil in tubing
                     
                     #Algebraic states
-                        [nfe in 1:NFE, ncp in 1:NCP],   p_ai[nfe, ncp]      == z[1,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   p_wh[nfe, ncp]      == z[2,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   p_ai[nfe, ncp]      == z[1,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   p_wh[nfe, ncp]      == z[2,nfe,ncp]
 
-                        [nfe in 1:NFE, ncp in 1:NCP],   rho_ai[nfe, ncp]    == z[3,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   rho_m[nfe, ncp]     == z[4,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   w_pc[nfe, ncp]      == z[5,nfe,ncp]     # total flow through choke
-                        [nfe in 1:NFE, ncp in 1:NCP],   w_pg[nfe, ncp]      == z[6,nfe,ncp]     # produced gas rate
-                        [nfe in 1:NFE, ncp in 1:NCP],   w_po[nfe, ncp]      == z[7,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   rho_ai[nfe, ncp]    == z[3,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   rho_m[nfe, ncp]     == z[4,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   w_pc[nfe, ncp]      == z[5,nfe,ncp]     # total flow through choke
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   w_pg[nfe, ncp]      == z[6,nfe,ncp]     # produced gas rate
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   w_po[nfe, ncp]      == z[7,nfe,ncp]
                                         
-                        # pressure at well injection point
-                        [nfe in 1:NFE, ncp in 1:NCP],   p_wi[nfe , ncp]     == z[8,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   p_bh[nfe, ncp]      == z[9,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   w_iv[nfe, ncp]      == z[10,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   w_ro[nfe, ncp]      == z[11,nfe,ncp]
-                        [nfe in 1:NFE, ncp in 1:NCP],   w_rg[nfe , ncp]     == z[12,nfe,ncp]
+                    #     # pressure at well injection point
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   p_wi[nfe , ncp]     == z[8,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   p_bh[nfe, ncp]      == z[9,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   w_iv[nfe, ncp]      == z[10,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   w_ro[nfe, ncp]      == z[11,nfe,ncp]
+                    #     [nfe in 1:NFE, ncp in 1:NCP],   w_rg[nfe , ncp]     == z[12,nfe,ncp]
 
-                    # Manipulated Inputs
-                        [nfe in 1:NFE],                 w_gl[nfe]           == u[1,nfe]
+                    # # Manipulated Inputs
+                    #     [nfe in 1:NFE],                 w_gl[nfe]           == u[1,nfe]
                 
                 end)
 
             #endregion
-
         #endregion
     
         ## Objective
-        @NLobjective(model1, Min,  sum(    w_gl[nfe] -  w_po[nfe]      for nfe in 1:NFE )  )
+        @NLobjective(model1, Min,  sum(    w_gl[nfe] -  w_po[nfe,1]      for nfe in 1:NFE )  )
     
     #endregion
 
+    nfe = 1 
+    ncp = 1
 
+##
     #region-> #*Define Constraints
 
         #fixing initial Point
@@ -180,27 +183,28 @@ x0 = [1.32, 0.8, 6.0]
 
         #Defining Model Algebraic Equations in each line
         @NLconstraints(model1, begin
-            Constr_Alg1[nfe in 1:NFE, ncp in 1:NCP],    p_ai[nfe,ncp]   == 1e-5*(((R*T_a/(V_a*Mw) + 9.81*H_a/V_a)*mass_ga[nfe,ncp]*1e3) + (Mw/(R*T_a)*((R*T_a/(V_a*Mw) + 9.81*H_a/V_a)*mass_ga[nfe,ncp]*1e3))*9.81*H_a) # annulus pressure    
-            Constr_Alg2[nfe in 1:NFE, ncp in 1:NCP],    p_wh[nfe,ncp]   == 1e-5*(((R*T_w/Mw)*(mass_gt[nfe,ncp]*1e3/(L_w*A_w + L_bh*A_bh - mass_ot[nfe,ncp]*1e3/rho_o))) - ((mass_gt[nfe,ncp]*1e3+mass_ot[nfe,ncp]*1e3 )/(L_w*A_w))*9.81*H_w/2) # wellhead pressure
-
             #
-            Constr_Alg3[nfe in 1:NFE, ncp in 1:NCP],    rho_ai[nfe,ncp] == 1e-2*(Mw/(R*T_a)*p_ai[nfe,ncp]*1e5)  # gas, in annulus
-            Constr_Alg4[nfe in 1:NFE, ncp in 1:NCP],    rho_m[nfe,ncp]  == 1e-2*(((mass_gt[nfe,ncp]*1e3 + mass_ot[nfe,ncp]*1e3)*p_wh[nfe,ncp]*1e5*Mw*rho_o)/(mass_ot[nfe,ncp]*1e3*p_wh[nfe,ncp]*1e5*Mw + rho_o*R*T_w*mass_gt[nfe,ncp]*1e3))  # mixture, in tubing
-            Constr_Alg5[nfe in 1:NFE, ncp in 1:NCP],    w_pc[nfe,ncp]   == C_pc*sqrt(rho_m[nfe,ncp]*1e2*(p_wh[nfe,ncp]*1e5 - p_m*1e5)) # total flow through choke
-            Constr_Alg6[nfe in 1:NFE, ncp in 1:NCP],    w_pg[nfe,ncp]   == (mass_gt[nfe,ncp]*1e3/(mass_gt[nfe,ncp]*1e3+mass_ot[nfe,ncp]*1e3))*w_pc[nfe,ncp] # produced gas rate
-            Constr_Alg7[nfe in 1:NFE, ncp in 1:NCP],    w_po[nfe,ncp]   == (mass_ot[nfe,ncp]*1e3/(mass_gt[nfe,ncp]*1e3+mass_ot[nfe,ncp]*1e3))*w_pc[nfe,ncp] # produced oil rate
-
+            Constr_Alg1[nfe in 1:NFE, ncp in 1:NCP],    p_ai[nfe,ncp]   == 1e-5#*(((R*T_a/(V_a*Mw) + 9.81*H_a/V_a)*mass_ga[nfe,ncp]*1e3) + (Mw/(R*T_a)*((R*T_a/(V_a*Mw) + 9.81*H_a/V_a)*mass_ga[nfe,ncp]*1e3))*9.81*H_a)                         # annulus pressure    
+            Constr_Alg2[nfe in 1:NFE, ncp in 1:NCP],    p_wh[nfe,ncp]   == 1e-5#*(((R*T_w/Mw)*(mass_gt[nfe,ncp]*1e3/(L_w*A_w + L_bh*A_bh - mass_ot[nfe,ncp]*1e3/rho_o))) - ((mass_gt[nfe,ncp]*1e3+mass_ot[nfe,ncp]*1e3 )/(L_w*A_w))*9.81*H_w/2)  # wellhead pressure
             #
-            Constr_Alg8[nfe  in 1:NFE, ncp in 1:NCP],    p_wi[nfe,ncp]  == 1e-5*((p_wh[nfe,ncp]*1e5 + 9.81/(A_w*L_w)*(mass_ot[nfe,ncp]*1e3+mass_gt[nfe,ncp]*1e3-rho_o*L_bh*A_bh)*H_w + 128*mu_oil*L_w*w_pc[nfe,ncp]/(3.141*D_w^4*((mass_gt[nfe,ncp]*1e3 + mass_ot[nfe,ncp]*1e3)*p_wh[nfe,ncp]*1e5*Mw*rho_o)/(mass_ot[nfe,ncp]*1e3*p_wh[nfe,ncp]*1e5*Mw + rho_o*R*T_w*mass_gt[nfe,ncp]*1e3))))
-            Constr_Alg9[nfe  in 1:NFE, ncp in 1:NCP],    p_bh[nfe,ncp]  == 1e-5*(p_wi[nfe,ncp]*1e5 + rho_o*9.81*H_bh + 128*mu_oil*L_bh*w_po[nfe,ncp]/(3.14*D_bh^4*rho_o)) 
-            Constr_Alg10[nfe in 1:NFE, ncp in 1:NCP],    w_iv[nfe,ncp]  == C_iv*sqrt(rho_ai[nfe,ncp]*1e2*(p_ai[nfe,ncp]*1e5 - p_wi[nfe,ncp]*1e5))
-            Constr_Alg11[nfe in 1:NFE, ncp in 1:NCP],    w_ro[nfe,ncp]  == PI*1e-6*(Press_r*1e5 - p_bh[nfe,ncp]*1e5) 
-            Constr_Alg12[nfe in 1:NFE, ncp in 1:NCP],    w_rg[nfe,ncp]  == 1e1*GOR*w_ro[nfe,ncp] 
+            Constr_Alg3[nfe in 1:NFE, ncp in 1:NCP],    rho_ai[nfe,ncp] == 1e-2#*(Mw/(R*T_a)*p_ai[nfe,ncp]*1e5)  # gas, in annulus
+            Constr_Alg4[nfe in 1:NFE, ncp in 1:NCP],    rho_m[nfe,ncp]  == 1e-2#*(((mass_gt[nfe,ncp]*1e3 + mass_ot[nfe,ncp]*1e3)*p_wh[nfe,ncp]*1e5*Mw*rho_o)/(mass_ot[nfe,ncp]*1e3*p_wh[nfe,ncp]*1e5*Mw + rho_o*R*T_w*mass_gt[nfe,ncp]*1e3))     # mixture, in tubing
+            #
+            Constr_Alg5[nfe in 1:NFE, ncp in 1:NCP],    w_pc[nfe,ncp]   == C_pc#*sqrt(rho_m[nfe,ncp]*1e2*(p_wh[nfe,ncp]*1e5 - p_m*1e5))                          # total flow through choke
+            Constr_Alg6[nfe in 1:NFE, ncp in 1:NCP],    w_pg[nfe,ncp]   == (mass_gt[nfe,ncp]*1e3/(mass_gt[nfe,ncp]*1e3 + mass_ot[nfe,ncp]*1e3))*w_pc[nfe,ncp]   # produced gas rate
+            Constr_Alg7[nfe in 1:NFE, ncp in 1:NCP],    w_po[nfe,ncp]   == (mass_ot[nfe,ncp]*1e3/(mass_gt[nfe,ncp]*1e3 + mass_ot[nfe,ncp]*1e3))*w_pc[nfe,ncp]   # produced oil rate
+            #
+            Constr_Alg8[nfe  in 1:NFE, ncp in 1:NCP],    p_wi[nfe,ncp]  == 1e-5#*((p_wh[nfe,ncp]*1e5 + 9.81/(A_w*L_w)*(mass_ot[nfe,ncp]*1e3 + mass_gt[nfe,ncp]*1e3-rho_o*L_bh*A_bh)*H_w + 128*mu_oil*L_w*w_pc[nfe,ncp] /  (3.141*D_w^4*((mass_gt[nfe,ncp]*1e3 + mass_ot[nfe,ncp]*1e3)*p_wh[nfe,ncp]*1e5*Mw*rho_o) /  (mass_ot[nfe,ncp]*1e3*p_wh[nfe,ncp]*1e5*Mw + rho_o*R*T_w*mass_gt[nfe,ncp]*1e3)  )  ))
+            Constr_Alg9[nfe  in 1:NFE, ncp in 1:NCP],    p_bh[nfe,ncp]  == 1e-5#*(p_wi[nfe,ncp]*1e5 + rho_o*9.81*H_bh + 128*mu_oil*L_bh*w_po[nfe,ncp]/(3.14*D_bh^4*rho_o)) 
+            #
+            Constr_Alg10[nfe in 1:NFE, ncp in 1:NCP],    w_iv[nfe,ncp]  == C_iv#*sqrt(rho_ai[nfe,ncp]*1e2*(p_ai[nfe,ncp]*1e5 - p_wi[nfe,ncp]*1e5))
+            Constr_Alg11[nfe in 1:NFE, ncp in 1:NCP],    w_ro[nfe,ncp]  == PI#*1e-6*(Press_r*1e5 - p_bh[nfe,ncp]*1e5) 
+            Constr_Alg12[nfe in 1:NFE, ncp in 1:NCP],    w_rg[nfe,ncp]  == 1e1#*GOR*w_ro[nfe,ncp] 
 
         end)
     
 
-                    #region-> #generic code -> Collocation Equation for Differential Equations AND Objective Function (No-scaling)
+        #region-> #generic code -> Collocation Equation for Differential Equations AND Objective Function (No-scaling)
                             ## Creating a Radau collocation Matrix for NCP = 3
                             Pdotₘₐₜ, Pₘₐₜ = collocation_matrix(3, "Radau")
                             @NLconstraints(model1, begin
@@ -222,9 +226,15 @@ x0 = [1.32, 0.8, 6.0]
 ##* Solve Model
 
 model1
+
 optimize!(model1)
 JuMP.termination_status(model1)
 JuMP.solve_time(model1::Model)
+
+
+
+
+
 
 
 # function gas_well!(dx,x,p,t)
