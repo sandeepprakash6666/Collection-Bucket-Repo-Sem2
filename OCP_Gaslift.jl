@@ -14,7 +14,7 @@ plotlyjs()
 include("Collocation_Matrix.jl")
 
 
-##* Model constants
+##* Model Parameters
 @with_kw struct WellPar
     # L, H, D = Length, Height, Diameter [m]
     
@@ -29,25 +29,25 @@ include("Collocation_Matrix.jl")
     D_bh = 0.121
     
     # annulus
-    L_a =  L_w
+    L_a = L_w
     H_a = H_w
     D_a = 0.189
 
-    rho_o = 800     # density of oil, kg/m3
+    rho_o  = 800     # density of oil, [kg/m3]
     mu_oil = 1*0.001
 
-    C_iv = 1e-3     # injection valve characteristic, m2
-    C_pc = 2e-3     # choke valve characteristic, m2
+    C_iv = 1e-3     # injection valve characteristic,[m2]
+    C_pc = 2e-3     # choke valve characteristic, [m2]
 
-    GOR0 = 0.1       # Gas Oil Ratio
-    PI0 = 2.2        # Productivity index, kg/s/bar
+    GOR0 = 0.1      # Gas Oil Ratio
+    PI0 = 2.2       # Productivity index, [kg/s/bar]
     
-    Press_r = 150   # reservoir pressure
-    p_m = 20        # manifold pressure
-    T_a = 28  + 273 # K
-    T_w = 32  + 273 # K
+    Press_r = 150   # reservoir pressure [bar]
+    p_m = 20        # manifold pressure  [bar]
+    T_a = 28  + 273 # [K]
+    T_w = 32  + 273 # [K]
 
-    Mw = 20e-3 # ? units g/mol
+    Mw = 20e-3      # ? units [g/mol]
 
 
 end
@@ -66,23 +66,25 @@ const R     = 8.314     # J/mol K
 const V_a   = L_a*(π*(D_a/2)^2 - π*(D_w/2)^2) 
 
 
-#* OCP Parameters
-T0  =  0.0  
-Tf  =  2.0                      #*hrs
-NFE =  60*2
-NCP =  3
+#* Model Initial states and Guesses
 
-dt  =  (Tf - T0)*3600/NFE       #*sec
+#Initial state and Guesses
+# x0 = [1.32; 0.8; 6.0]    
 
-Nx = 3
-Nu = 1
-Nz = 12
+# dx_guess = 0*copy(x0)
+# x_guess = copy(x0)
+# # z_guess = [77.0; 47.0; 62.0; 240.0; 38.0; 4.4; 34.0; 61.0; 100.0; 1.0; 34.0; 3.4]
+# u_guess = [1.0]
 
-x0 = [1.32; 0.8; 6.0]   #initial state 
+    #Initial State and Guesses - from SS soln
+    x0 = [ 3.6902822709988854  1.9050192017979886  0.20234621601298794]
+    dx_guess = [0.0 0.0 0.0]
+    x_guess = [ 3.6902822709988854  1.9050192017979886  0.20234621601298794]
+    z_guess = [216.23  100.199  1.7281  0.86515  52.6818  47.6234  5.05843  87.7611  127.007  47.1175  5.05843  5.05843] #From SS soln
+    u_guess = [47.117526523816565]  
 
-x_guess = copy(x0)
-z_guess = [77.0; 47.0; 62.0; 240.0; 38.0; 4.4; 34.0; 61.0; 100.0; 1.0; 34.0; 3.4]
-u_guess = [1.0]
+
+
 
 x_lb = [10e-3; 10e-3; 10e-3]
 x_ub = [10e7;  10e7;  10e7]
@@ -93,13 +95,39 @@ z_ub = [150e4; 70e4;    900e4; 900e4;   50e4; 50e4; 50e4;   150e4; 150e4;   50e4
 u_lb = [5e-1]
 u_ub = [50e4]
 
-dx0 = 0*x_guess
+dx0 = 0*copy(x_guess)
 
-GOR = hcat(     0.1*ones(1, convert(Int32, NFE/3)),      0.12*ones(1,convert(Int32, NFE/3)),     0.14*ones(1,convert(Int32, NFE/3)))
-PI  = PI0*ones( 1,NFE) 
+
+#* OCP Parameters
+T0  =  0.0  
+Tf  =  1.0                      #*hrs
+NFE =  30
+NCP =  3
+
+dt  =  (Tf - T0)*3600/NFE       #*sec
+
+Nx = 3
+Nu = 1
+Nz = 12
+
+#Steady State - Constant Disturbance
+GOR = GOR0*ones(1,NFE) 
+# PI  = PI0*ones( 1,NFE) 
+    
+    #Step Changes
+    # GOR = hcat(     0.1*ones(1, convert(Int32, NFE/3)),      0.15*ones(1,convert(Int32, NFE/3)),     0.15*ones(1,convert(Int32, NFE/3)))
+    PI  = hcat(     2.2*ones(1, convert(Int32, NFE/3)),      2.4*ones(1,convert(Int32, NFE/3)),      2.4*ones(1,convert(Int32, NFE/3)))
 
 
 ##
+find_a_SS = 0
+if NFE == 1 && NCP == 1
+    global find_a_SS = 1
+end
+    
+Sim_Mode = 1    #*To simulate using IpOPT 
+
+
     ##* Defining Solver
     model1 = Model(with_optimizer(Ipopt.Optimizer))
     set_optimizer_attributes(model1, "max_iter" => 1000)
@@ -143,20 +171,10 @@ PI  = PI0*ones( 1,NFE)
                     z_lb[11] <= w_ro[nfe in 1:NFE, ncp in 1:NCP]        <= z_ub[11]     , (start = z_guess[11])
                     z_lb[12] <= w_rg[nfe in 1:NFE, ncp in 1:NCP]        <= z_ub[12]     , (start = z_guess[12])
 
-                # Manipulated Inputs
+                    # Manipulated Inputs
                     u_lb[1] <=  w_gl[nfe in 1:NFE]                      <= u_ub[1]      , (start = u_guess[1])
-            end)
+                end)
             #endregion
-
-            #Set Initial Guesses for variables
-        #     for nx in 1:Nx, nfe in 1:NFE, ncp in 1:NCP
-        #         set_start_value(x[nx, nfe, ncp],    x_guess[nx])
-        #         # set_start_value(z[nz, nfe, ncp],    z_guess[nz])
-        #         set_start_value(dx_us[nx, nfe, ncp],dx0[nx])
-        #         # set_start_value(u[nu, nfe],         u_guess[nu])
-        #         # set_start_value(q[1, nfe, ncp],     q0)
-        #         # set_start_value(dq[1, nfe, ncp],    dq0)
-        #   end
 
             #region-> Mapping the auxilliary variables to general OCP variable vectors
                 @constraints(model1, begin
@@ -170,16 +188,30 @@ PI  = PI0*ones( 1,NFE)
         #endregion
     
         ## Objective
-        @NLobjective(model1, Min,  sum(    w_gl[nfe] -  w_po[nfe,1]      for nfe in 1:NFE )  )
-    
+        if Sim_Mode == 0
+            if find_a_SS == 0
+                @NLobjective(model1, Min,  sum(    w_gl[nfe] -  w_po[nfe,1]      for nfe in 1:NFE )  )
+            end
+        end
+
     #endregion
 
     #region-> #*Define Constraints
 
-        #fixing initial Point
-        @NLconstraints(model1, begin
-            Constr_x0[nx in 1:Nx],  x[nx,1,1] == x0[nx]
-        end)
+        if find_a_SS == 0
+            #fixing initial Point
+            @NLconstraints(model1, begin
+                Constr_x0[nx in 1:Nx],  x[nx,1,1] == x0[nx]
+            end)
+        end
+
+        #Fixing the inputs if simulation mode
+        if Sim_Mode == 1
+            for nfe in 1:NFE
+                fix(w_gl[nfe],  u_guess[1] ; force = true)
+            end
+        end
+
 
         #Defining the model ODEs in each line
         @NLconstraints(model1, begin
@@ -205,7 +237,7 @@ PI  = PI0*ones( 1,NFE)
             Constr_Alg9[nfe  in 1:NFE, ncp in 1:NCP],    p_bh[nfe,ncp]  == 1e-5*(p_wi[nfe,ncp]*1e5 + rho_o*9.81*H_bh + 128*mu_oil*L_bh*w_po[nfe,ncp]/(3.14*D_bh^4*rho_o)) 
             #
             Constr_Alg10[nfe in 1:NFE, ncp in 1:NCP],    w_iv[nfe,ncp]^2  == C_iv^2*(rho_ai[nfe,ncp]*1e2*(p_ai[nfe,ncp]*1e5 - p_wi[nfe,ncp]*1e5))
-            Constr_Alg11[nfe in 1:NFE, ncp in 1:NCP],    w_ro[nfe,ncp]  == PI0*1e-6*(Press_r*1e5 - p_bh[nfe,ncp]*1e5) 
+            Constr_Alg11[nfe in 1:NFE, ncp in 1:NCP],    w_ro[nfe,ncp]  == PI[nfe]*1e-6*(Press_r*1e5 - p_bh[nfe,ncp]*1e5) 
             Constr_Alg12[nfe in 1:NFE, ncp in 1:NCP],    w_rg[nfe,ncp]  == 1e1*GOR[nfe]*w_ro[nfe,ncp] 
 
         end)
@@ -216,7 +248,8 @@ PI  = PI0*ones( 1,NFE)
             Constr_Alg10_1[nfe in 1:NFE, ncp in 1:NCP],  (rho_ai[nfe,ncp]*1e2*(p_ai[nfe,ncp]*1e5 - p_wi[nfe,ncp]*1e5))   >= 0
         end)
     
-        #region-> #generic code -> Collocation Equation for Differential Equations AND Objective Function (No-scaling)
+        if isSS == 0
+            #region-> #generic code -> Collocation Equation for Differential Equations AND Objective Function (No-scaling)
                             ## Creating a Radau collocation Matrix for NCP = 3
                             Pdotₘₐₜ, Pₘₐₜ = collocation_matrix(3, "Radau")
                             @NLconstraints(model1, begin
@@ -230,7 +263,12 @@ PI  = PI0*ones( 1,NFE)
 
                             end)
                     #endregion
-
+        else
+            @NLconstraints(model1, begin
+                Constr_SS[nx in 1:Nx, nfe in 1:NFE, ncp in 1:NCP], dx_us[nx,nfe,ncp] == 0    
+            end)
+              
+        end
     #endregion
 
 ##* Solve Model 
@@ -243,13 +281,42 @@ JuMP.termination_status(model1)
 JuMP.solve_time(model1::Model)
 
 
+
 JuMP.value.(mass_ga[:, NCP])
 JuMP.value.(mass_gt[:, NCP])
 JuMP.value.(mass_ot[:, NCP])
 
 
-star_w_po = JuMP.value.(w_po[:, NCP])
-star_w_gl = JuMP.value.(w_gl[:])
+
+if isSS == 1
+    dx_guess = JuMP.value.(dx_us[:, NCP])
+    x_guess = JuMP.value.(x[:,NFE,NCP])
+    u_guess = JuMP.value.(w_gl[NFE,NCP])
+    z_guess = hcat(
+                    JuMP.value.(p_ai[NFE,NCP]),
+                    JuMP.value.(p_wh[NFE, NCP]),
+
+                    JuMP.value.(rho_ai[NFE, NCP]),
+                    JuMP.value.(rho_m[NFE, NCP]), 
+                                        
+                    JuMP.value.(w_pc[NFE, NCP]),      
+                    JuMP.value.(w_pg[NFE, NCP]),   
+                    JuMP.value.(w_po[NFE, NCP]),      
+
+                    JuMP.value.(p_wi[NFE, NCP]),        
+                    JuMP.value.(p_bh[NFE, NCP]),        
+                                        
+                    JuMP.value.(w_iv[NFE, NCP]),       
+                    JuMP.value.(w_ro[NFE, NCP]),       
+                    JuMP.value.(w_rg[NFE, NCP])  
+                   )
+
+end
+
+
+
+# star_w_po = JuMP.value.(w_po[:, NCP])
+# star_w_gl = JuMP.value.(w_gl[:])
 
 
 
@@ -257,12 +324,12 @@ star_w_gl = JuMP.value.(w_gl[:])
 
 t_plot = collect(T0:  dt/3600:  Tf)    #Returns NFE+1 dimensional vector
 
-p11 = plot(t_plot[1:end-1], GOR[:],                 label = "GOR",  linetype = :steppost, linestyle = :dash)
+p11 = plot(t_plot[1:end-1], GOR[:],                                 label = "GOR",  linetype = :steppost, linestyle = :dash)
 
-p12 = plot(t_plot[1:end-1], JuMP.value.(w_gl[:]),   label = "w_gl", linetype = :steppost)
+p12 = plot(t_plot[1:end-1], JuMP.value.(w_gl[:]),                   label = "w_gl", linetype = :steppost)
 
 p13 = plot(t_plot[1:end-1], JuMP.value.(w_po[:, NCP]),              label = "w_po")
-p13 = plot!(t_plot[1:end-1], JuMP.value.(w_pg[:, NCP]),              label = "w_pg")
+p13 = plot!(t_plot[1:end-1], JuMP.value.(w_pg[:, NCP]),             label = "w_pg")
 
 p14 = plot(t_plot[1:end-1], JuMP.value.(mass_ot[:, NCP]),           label = "m_ot")
 p14 = plot!(t_plot[1:end-1], JuMP.value.(mass_gt[:, NCP]),          label = "m_gt")
