@@ -70,18 +70,17 @@ const V_a   = L_a*(π*(D_a/2)^2 - π*(D_w/2)^2)
 
 #Initial state and Guesses
 # x0 = [1.32; 0.8; 6.0]    
-
 # dx_guess = 0*copy(x0)
 # x_guess = copy(x0)
-# # z_guess = [77.0; 47.0; 62.0; 240.0; 38.0; 4.4; 34.0; 61.0; 100.0; 1.0; 34.0; 3.4]
-# u_guess = [1.0]
+# z_guess = [77.0; 47.0; 62.0; 240.0; 38.0; 4.4; 34.0; 61.0; 100.0; 1.0; 34.0; 3.4]
+# u_guess = [4.0]
 
     #Initial State and Guesses - from SS soln
-    x0 = [ 3.6902822709988854  1.9050192017979886  0.20234621601298794]
+    x0 = [ 0.542795291698938  0.6846276143694843  2.1849891418611014]
     dx_guess = [0.0 0.0 0.0]
-    x_guess = [ 3.6902822709988854  1.9050192017979886  0.20234621601298794]
-    z_guess = [216.23  100.199  1.7281  0.86515  52.6818  47.6234  5.05843  87.7611  127.007  47.1175  5.05843  5.05843] #From SS soln
-    u_guess = [47.117526523816565]  
+    x_guess = [  0.542795291698938  0.6846276143694843  2.1849891418611014]
+    z_guess = [ 31.8047  34.6697  0.254182  1.03341  24.6251  5.87501  18.7501  25.51  64.7723  4.0  18.7501  18.7501] #From SS soln
+    u_guess = [4.0]  
 
 
 
@@ -125,7 +124,7 @@ if NFE == 1 && NCP == 1
     global find_a_SS = 1
 end
     
-Sim_Mode = 1    #*To simulate using IpOPT 
+Sim_Mode = 0   #*To simulate model using IpOPT 
 
 
     ##* Defining Solver
@@ -205,8 +204,8 @@ Sim_Mode = 1    #*To simulate using IpOPT
             end)
         end
 
-        #Fixing the inputs if simulation mode
-        if Sim_Mode == 1
+        #Fixing the inputs if simulation mode OR finding a SS fr the given GL flow
+        if Sim_Mode == 1 || find_a_SS == 1
             for nfe in 1:NFE
                 fix(w_gl[nfe],  u_guess[1] ; force = true)
             end
@@ -248,7 +247,7 @@ Sim_Mode = 1    #*To simulate using IpOPT
             Constr_Alg10_1[nfe in 1:NFE, ncp in 1:NCP],  (rho_ai[nfe,ncp]*1e2*(p_ai[nfe,ncp]*1e5 - p_wi[nfe,ncp]*1e5))   >= 0
         end)
     
-        if isSS == 0
+        if find_a_SS == 0
             #region-> #generic code -> Collocation Equation for Differential Equations AND Objective Function (No-scaling)
                             ## Creating a Radau collocation Matrix for NCP = 3
                             Pdotₘₐₜ, Pₘₐₜ = collocation_matrix(3, "Radau")
@@ -264,6 +263,7 @@ Sim_Mode = 1    #*To simulate using IpOPT
                             end)
                     #endregion
         else
+            #finding SS, so dx = 0
             @NLconstraints(model1, begin
                 Constr_SS[nx in 1:Nx, nfe in 1:NFE, ncp in 1:NCP], dx_us[nx,nfe,ncp] == 0    
             end)
@@ -287,8 +287,7 @@ JuMP.value.(mass_gt[:, NCP])
 JuMP.value.(mass_ot[:, NCP])
 
 
-
-if isSS == 1
+if find_a_SS == 1
     dx_guess = JuMP.value.(dx_us[:, NCP])
     x_guess = JuMP.value.(x[:,NFE,NCP])
     u_guess = JuMP.value.(w_gl[NFE,NCP])
@@ -314,24 +313,20 @@ if isSS == 1
 end
 
 
-
-# star_w_po = JuMP.value.(w_po[:, NCP])
-# star_w_gl = JuMP.value.(w_gl[:])
-
-
-
 ##* Plotting Solution of OCP
 
-t_plot = collect(T0:  dt/3600:  Tf)    #Returns NFE+1 dimensional vector
+t_plot = collect(T0:  dt/3600:  Tf)    #Returns NFE+1 dimensional vector [in hrs]
 
 p11 = plot(t_plot[1:end-1], GOR[:],                                 label = "GOR",  linetype = :steppost, linestyle = :dash)
+p11 = plot!(t_plot[1:end-1], PI[:],                                 label = "PI",  linetype = :steppost, linestyle = :dash)
 
 p12 = plot(t_plot[1:end-1], JuMP.value.(w_gl[:]),                   label = "w_gl", linetype = :steppost)
 
 p13 = plot(t_plot[1:end-1], JuMP.value.(w_po[:, NCP]),              label = "w_po")
 p13 = plot!(t_plot[1:end-1], JuMP.value.(w_pg[:, NCP]),             label = "w_pg")
 
-p14 = plot(t_plot[1:end-1], JuMP.value.(mass_ot[:, NCP]),           label = "m_ot")
+p14 = plot(t_plot[1:end-1], JuMP.value.(mass_ga[:, NCP]),           label = "m_ga")
+p14 = plot!(t_plot[1:end-1], JuMP.value.(mass_ot[:, NCP]),          label = "m_ot")
 p14 = plot!(t_plot[1:end-1], JuMP.value.(mass_gt[:, NCP]),          label = "m_gt")
 
 
