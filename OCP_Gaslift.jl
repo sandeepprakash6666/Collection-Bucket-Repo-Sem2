@@ -68,11 +68,11 @@ const V_a   = L_a*(π*(D_a/2)^2 - π*(D_w/2)^2)
 
 #* OCP Parameters
 T0  =  0.0  
-Tf  =  4.0                    #hrs
-NFE =  60
+Tf  =  2.0                      #*hrs
+NFE =  60*2
 NCP =  3
 
-dt  =  (Tf - T0)*3600/NFE   #sec
+dt  =  (Tf - T0)*3600/NFE       #*sec
 
 Nx = 3
 Nu = 1
@@ -95,8 +95,8 @@ u_ub = [50e4]
 
 dx0 = 0*x_guess
 
-GOR = hcat(0.1*ones(1,20),  0.12*ones(1,20), 0.14*ones(1,20))
-PI  = PI0*ones(1,NFE) 
+GOR = hcat(     0.1*ones(1, convert(Int32, NFE/3)),      0.12*ones(1,convert(Int32, NFE/3)),     0.14*ones(1,convert(Int32, NFE/3)))
+PI  = PI0*ones( 1,NFE) 
 
 
 ##
@@ -247,22 +247,33 @@ JuMP.value.(mass_ga[:, NCP])
 JuMP.value.(mass_gt[:, NCP])
 JuMP.value.(mass_ot[:, NCP])
 
-star_w_po = JuMP.value.(w_po[:, NCP])
 
+star_w_po = JuMP.value.(w_po[:, NCP])
 star_w_gl = JuMP.value.(w_gl[:])
 
 
 
 ##* Plotting Solution of OCP
 
-t_plot = collect(T0:dt/3600:Tf)    #Returns NFE+1 dimensional vector
+t_plot = collect(T0:  dt/3600:  Tf)    #Returns NFE+1 dimensional vector
 
-p11 = plot(t_plot[1:end-1], star_w_gl,              label = "w_gl", linetype = :steppost)
-p12 = plot(t_plot[1:end-1], GOR[:],                 label = "GOR",  linetype = :steppost, linestyle = :dash)
+p11 = plot(t_plot[1:end-1], GOR[:],                 label = "GOR",  linetype = :steppost, linestyle = :dash)
 
-p21 = plot(t_plot[1:end-1], star_w_po,              label = "w_po")
+p12 = plot(t_plot[1:end-1], JuMP.value.(w_gl[:]),   label = "w_gl", linetype = :steppost)
+
+p13 = plot(t_plot[1:end-1], JuMP.value.(w_po[:, NCP]),              label = "w_po")
+p13 = plot!(t_plot[1:end-1], JuMP.value.(w_pg[:, NCP]),              label = "w_pg")
+
+p14 = plot(t_plot[1:end-1], JuMP.value.(mass_ot[:, NCP]),           label = "m_ot")
+p14 = plot!(t_plot[1:end-1], JuMP.value.(mass_gt[:, NCP]),          label = "m_gt")
 
 
+##
+
+p11
+p12
+p13
+p14
 
 
 
