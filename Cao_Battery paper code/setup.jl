@@ -1,3 +1,10 @@
+
+##*Added by Sandy
+
+using DelimitedFiles
+
+##*
+##Params
 Sei = true
 Cum = true
 
@@ -91,37 +98,42 @@ Nt_FR_year = round(Int, 365 * 24 * 3600 / dt_FR)
 Nt_FR = round(Int, Totaltime / dt_FR) + 1           # number of FR time step
 TIME_FR = 0:dt_FR:Totaltime
 
+##*Loading Data from Files
 
-Files = [
-    "FR/01_2017_Dynamic.csv",
-    "FR/02_2017_Dynamic.csv",
-    "FR/03_2017_Dynamic.csv",
-    "FR/04_2017_Dynamic.csv",
-    "FR/05_2017_Dynamic.csv",
-    "FR/06_2017_Dynamic.csv",
-    "FR/07_2017_Dynamic.csv",
-    "FR/08_2017_Dynamic.csv",
-    "FR/09_2017_Dynamic.csv",
-    "FR/10_2017_Dynamic.csv",
-    "FR/11_2017_Dynamic.csv",
-    "FR/12_2017_Dynamic.csv",
-]
-signal = []
-for i = 1:12
-    filename = Files[i]
-    originalsignal = readdlm(filename, ',', Float64)[1:(end-1), :]   # positive means the grid sends power to battery (charging) and negative means grid buys power from battery(discharging).
-    if i == 1
-        signal = vcat(originalsignal...)
-    else
-        signal = [signal; vcat(originalsignal...)]
+    Files = [
+        "FR/01_2017_Dynamic.csv",
+        "FR/02_2017_Dynamic.csv",
+        "FR/03_2017_Dynamic.csv",
+        "FR/04_2017_Dynamic.csv",
+        "FR/05_2017_Dynamic.csv",
+        "FR/06_2017_Dynamic.csv",
+        "FR/07_2017_Dynamic.csv",
+        "FR/08_2017_Dynamic.csv",
+        "FR/09_2017_Dynamic.csv",
+        "FR/10_2017_Dynamic.csv",
+        "FR/11_2017_Dynamic.csv",
+        "FR/12_2017_Dynamic.csv",
+    ]
+
+    signal = []
+    for i = 1:12
+        filename = Files[i]
+        originalsignal = readdlm(filename, ',', Float64)[1:(end-1), :]   # positive means the grid sends power to battery (charging) and negative means grid buys power from battery(discharging).
+        if i == 1
+            signal = vcat(originalsignal...)
+        else
+            signal = [signal; vcat(originalsignal...)]
+        end
+        if i == 12
+            signal = [signal; originalsignal[end, end]]
+        end
     end
-    if i == 12
-        signal = [signal; originalsignal[end, end]]
-    end
-end
+    signal
+
 signal = min.(max.(signal, -1), 1)
 signal = repeat(signal; outer = [nyears])
 signal = signal[1:Nt_FR]
+
 FR_price = readdlm("FR/FR_Incentive.csv", ',', Float64)
 FR_price = vcat(FR_price'...)
 FR_price = repeat(FR_price; outer = [nyears])
@@ -388,8 +400,12 @@ csp_avg0 = cspmax * 1 - csnmax * soc * lnn * en / lp / ep            # 49503.111
 csn_avg0 = csnmax * soc
 delta_sei0 = 1e-10
 u0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
-u0[1:Ncp] = csp_avg0
-u0[(Ncp+1):(Ncp+Ncn)] = csn_avg0
+
+    #!changed to broadcasting here
+    u0[1:Ncp] .= csp_avg0
+    u0[(Ncp+1):(Ncp+Ncn)] .= csn_avg0
+    u0
+
 if Sei
     u0[Ncp+Ncn+7] = delta_sei0              # delta_sei
 end
@@ -405,17 +421,23 @@ end
 
 
 
+#todo: function disabled
+# function MPC(u0, method)
+method = "sim_MPC"
 
-function MPC(u0, method)
     println("MPC start")
-    tic()
+        
+        #!changed from tic to start
+        # tic()
+        start = time()
 
+    #region()#*Initializing variables (with zeroes)
     i_start = 1
     i_end = 1
     FR_band_list = zeros(TotalHours)
     buy_from_grid = zeros(TotalHours)
     capacity_remain_list = soc_retire * ones(TotalHours)
-    csp_avg_list = zeros(Nt_FR_year + 1)
+    csp_avg_list = zeros(Nt_FR_year + 1)                    #Surface Conc ? 
     csn_avg_list = zeros(Nt_FR_year + 1)
     delta_sei_list = zeros(Nt_FR_year + 1)
     cf_list = zeros(Nt_FR_year + 1)
@@ -436,12 +458,17 @@ function MPC(u0, method)
     solu = []
     year = 1
     hours_moving = 1
+    #endregion()
 
-    for i_start = 1:Nt_FR_hour*hours_moving:(Nt_FR-Nt_FR_hour)
+    #todo: for loop disabled
+    # for i_start = 1:Nt_FR_hour*hours_moving:(Nt_FR-Nt_FR_hour)
+        i_start = 1
+
         i_end = i_start + Nt_FR_hour * hours_moving
         i_start_hour = Int(floor(TIME_FR[i_start] / 3600)) + 1
         i_end_hour = i_start_hour + hours_moving - 1
 
+        #region()#*Creating name string for .jld file : filename
         if method == "FP_MPC"
             filename = string(
                 "Result/FP_MPC/Min",
@@ -489,29 +516,35 @@ function MPC(u0, method)
         elseif method == "Heuristic"
             filename = string("Result/Heuristic/Min", soc_min, "C", C, ".jld")
         end
+        
+        #endregion() 
+        filename
 
+
+        #region()#*Saving 1 year worth results to file ?
         if TIME_FR[i_start] >= year * 3600 * 24 * 365
             save(
                 filename,
-                "csp_avg_list",
-                csp_avg_list,
-                "csn_avg_list",
-                csn_avg_list,
-                "delta_sei_list",
+                "csp_avg_list",     #Surface Conc +ve
+                csp_avg_list,       
+                "csn_avg_list",     #Surface Conc -ve
+                csn_avg_list,       
+                "delta_sei_list",   #Film thickness
                 delta_sei_list,
-                "cf_list",
+                "cf_list",          #Cumulative Capacity Fade
                 cf_list,
-                "pot_list",
+                "pot_list",         #?
                 pot_list,
-                "it_list",
+                "it_list",          #?
                 it_list,
-                "isei_list",
+                "isei_list",        #?
                 isei_list,
-                "Q_list",
+                "Q_list",           #?
                 Q_list,
-                "P_FR",
+                "P_FR",             #charge/ discharge rate of battery
                 P_FR,
             )
+
             year = year + 1
             csp_avg_list[:] = 0
             csn_avg_list[:] = 0
@@ -525,6 +558,8 @@ function MPC(u0, method)
             P_FR[:] = 0
             waste_list[:] = 0
         end
+        #endregion()
+
 
         du0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
         cf0 = u0[Ncp+Ncn+Nsei+8]
@@ -532,6 +567,7 @@ function MPC(u0, method)
         capacity_remain = 1 - fade
         csn_avg = u0[Ncp+1]
         soc = csn_avg / csnmax
+        
         if capacity_remain <= soc_retire
             retire_time = TIME_FR[i_start]
             retire_index = i_start
@@ -838,7 +874,11 @@ function MPC(u0, method)
         )
     end
 
-    println("elapsed time:     ", toc())
+        #!changed from toc to time()
+        # println("elapsed time:     ", toc())
+        elapsed = time() - start
+        println("elapsed time:     ", elapsed)
+
 
 
     Area = 1e6 / P_nominal
