@@ -2,101 +2,113 @@
 ##*Added by Sandy
 
 using DelimitedFiles
+using Sundials
+using Plots
 
-##*
-##Params
-Sei = true
-Cum = true
+ones(3)
+plot(collect(Float64, 1:2:5), 5*ones(3))
+
+#todo- Remove from here
+    nHours_Horizon = 1
+
+##
+#region#*Params
+    Sei = true
+    Cum = true
 
 
-# A. Number of node points
-N1 = 20
-N2 = 20
-Ncp = 2 # number of concentration at the positive side
-Ncn = 2 # number of concentration at the positive side
-Nsei = 3
-if !Sei
-    Nsei = 0
-end
-Ncum = 0
-if Cum
-    Ncum += 2
-    if Sei
-        Ncum += 2
+    # A. Number of node points
+    N1 = 20
+    N2 = 20
+    Ncp = 2 # number of concentration at the positive side
+    Ncn = 2 # number of concentration at the positive side
+    Nsei = 3
+    if !Sei
+        Nsei = 0
     end
-end
+    Ncum = 0
+    if Cum
+        Ncum += 2
+        if Sei
+            Ncum += 2
+        end
+    end
 
 
-#= 
-B. Parameters
-1: cathode, 2: anode
-Dp,Dn: Solid phase diffusivity (m2/s),
-kp, kn: Rate constant for lithium intercalation reaction (m2.5/(mol0.5s))
-cspmax,csnmax: Maximum solid phase concentration at positive (mol/m3),
-lp,ln : Region thickness (m),
-ap,an: Particel surface area to volume (m2/m3)
-Rpp ,Rpn: particle radius at positive (m),
-ce: Electrolyte Concentration (mol/m3)
-M[sei]: Molecular weight of SEI (Kg/mol)
-Kappa[sei]: SEI ionic conductivity (S/m)
-rho[sei]: SEI density (Kg/m3)
-ksei: rate constant of side reaction (C m/s mol)
-F : Faraday's constant (C/mol) , R : Ideal gas constant (J/K/mol), T : Temperature (K) =#
+    #= 
+    B. Parameters
+    1: cathode, 2: anode
+    Dp,Dn: Solid phase diffusivity (m2/s),
+    kp, kn: Rate constant for lithium intercalation reaction (m2.5/(mol0.5s))
+    cspmax,csnmax: Maximum solid phase concentration at positive (mol/m3),
+    lp,ln : Region thickness (m),
+    ap,an: Particel surface area to volume (m2/m3)
+    Rpp ,Rpn: particle radius at positive (m),
+    ce: Electrolyte Concentration (mol/m3)
+    M[sei]: Molecular weight of SEI (Kg/mol)
+    Kappa[sei]: SEI ionic conductivity (S/m)
+    rho[sei]: SEI density (Kg/m3)
+    ksei: rate constant of side reaction (C m/s mol)
+    F : Faraday's constant (C/mol) , R : Ideal gas constant (J/K/mol), T : Temperature (K) =#
 
-F = 96487
-R = 8.3143
-T = 298.15
-M_sei = 0.073
-Kappa_sei = 5e-6
-rho_sei = 2.1e3
-ksei = 1.5e-12                            # 1e-8
-Urefs = 0.4
-Rsei = 0.01
-
-
-area = 1  # 0.3108
-cspmax = 10350
-csnmax = 29480
-lp = 6.521e-5
-lnn = 2.885e-5
-Rpp = 1.637e-7
-Rpn = 3.596e-6
-ce = 1042
-ep = 1 - 0.52
-en = 1 - 0.619
-ap = 3 * ep / Rpp
-an = 3 * en / Rpn
-Sp = area * lp * ap
-Sn = area * lnn * an
-kp = 1.127e-7 / F
-kn = 8.696e-7 / F
-Dn = 8.256e-14
-Dp = 1.736e-14
-TC = 2.3 / 0.3108
-Qmax = TC
-P_nominal = TC * 3.1
+    F = 96487
+    R = 8.3143
+    T = 298.15
+    M_sei = 0.073
+    Kappa_sei = 5e-6
+    rho_sei = 2.1e3
+    ksei = 1.5e-12                            # 1e-8
+    Urefs = 0.4
+    Rsei = 0.01
 
 
-differential_vars = trues(Ncp + Ncn + 4 + Nsei + Ncum)
-differential_vars[Ncp] = false
-differential_vars[Ncp+Ncn] = false
-differential_vars[Ncp+Ncn+1] = false
-differential_vars[Ncp+Ncn+2] = false
-differential_vars[Ncp+Ncn+3] = false
-differential_vars[Ncp+Ncn+4] = false
-if Sei
-    differential_vars[Ncp+Ncn+5] = false
-    differential_vars[Ncp+Ncn+6] = false
-end
+    area = 1  # 0.3108
+    cspmax = 10350
+    csnmax = 29480
+    lp = 6.521e-5
+    lnn = 2.885e-5
+    Rpp = 1.637e-7
+    Rpn = 3.596e-6
+    ce = 1042
+    ep = 1 - 0.52
+    en = 1 - 0.619
+    ap = 3 * ep / Rpp
+    an = 3 * en / Rpn
+    Sp = area * lp * ap
+    Sn = area * lnn * an
+    kp = 1.127e-7 / F
+    kn = 8.696e-7 / F
+    Dn = 8.256e-14
+    Dp = 1.736e-14
+    TC = 2.3 / 0.3108
+    Qmax = TC
+    P_nominal = TC * 3.1
 
-nyears = 2
-Totaltime = nyears * 365 * 24 * 60 * 60                 # seconds
-TotalHours = round(Int, Totaltime / 3600)         # hours
-dt_FR = 2                                       # time step for FR
-Nt_FR_hour = round(Int, 3600 / dt_FR)
-Nt_FR_year = round(Int, 365 * 24 * 3600 / dt_FR)
-Nt_FR = round(Int, Totaltime / dt_FR) + 1           # number of FR time step
-TIME_FR = 0:dt_FR:Totaltime
+
+    differential_vars = trues(Ncp + Ncn + 4 + Nsei + Ncum)
+    differential_vars[Ncp] = false
+    differential_vars[Ncp+Ncn] = false
+    differential_vars[Ncp+Ncn+1] = false
+    differential_vars[Ncp+Ncn+2] = false
+    differential_vars[Ncp+Ncn+3] = false
+    differential_vars[Ncp+Ncn+4] = false
+    if Sei
+        differential_vars[Ncp+Ncn+5] = false
+        differential_vars[Ncp+Ncn+6] = false
+    end
+    differential_vars
+
+    nyears = 2
+    Totaltime = nyears * 365 * 24 * 60 * 60                 # seconds
+    TotalHours = round(Int, Totaltime / 3600)         # hours
+    dt_FR = 2                                       # time step for FR
+    Nt_FR_hour = round(Int, 3600 / dt_FR)
+    Nt_FR_year = round(Int, 365 * 24 * 3600 / dt_FR)
+    Nt_FR = round(Int, Totaltime / dt_FR) + 1           # number of FR time step
+    TIME_FR = 0:dt_FR:Totaltime
+
+#endregion
+
 
 ##*Loading Data from Files
 
@@ -142,7 +154,9 @@ grid_price = readdlm("FR/slow_Price.csv", ',', Float64)
 grid_price = vcat(grid_price'...)
 grid_price = repeat(grid_price; outer = [nyears])
 
+##? Some function defenitions - Currently Skipped
 
+#*DAE for common part of plant
 function f_common(out, du, u, p, t)
     value = p[1]
 
@@ -167,6 +181,7 @@ function f_common(out, du, u, p, t)
         it = iint
         delta_sei = 0
     end
+
     if Cum
         cm = u[Ncp+Ncn+5+Nsei]
         cp = u[Ncp+Ncn+6+Nsei]
@@ -254,7 +269,9 @@ end
 
 function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
 
-    m = Model(solver = IpoptSolver(print_level = 0))
+    # m = Model(solver = IpoptSolver(print_level = 0))
+    m = Model(with_optimizer(Ipopt.Optimizer))
+
     if !Sei
         delta_sei = 0
     end
@@ -373,7 +390,9 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     elseif mode == 3
         @constraint(m, it * (phi_p - phi_n) == value)
     end
-    JuMP.solve(m)
+    # JuMP.solve(m)
+    JuMP.optimize!(m)
+    
     iint0 = getvalue(iint)
     csp_s0 = getvalue(csp_s)
     csn_s0 = getvalue(csn_s)
@@ -382,9 +401,11 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     pot0 = phi_p0 - phi_n0
     it0 = getvalue(it)
     isei0 = getvalue(isei)
+
     return csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0
 end
 
+##*
 
 V_max = 3.65
 V_min = 2.0
@@ -419,11 +440,12 @@ if Cum
 end
 
 
-
+##*
 
 #todo: function disabled
-# function MPC(u0, method)
 method = "sim_MPC"
+
+# function MPC(u0, method)
 
     println("MPC start")
         
@@ -460,15 +482,17 @@ method = "sim_MPC"
     hours_moving = 1
     #endregion()
 
+##
     #todo: for loop disabled
+    i_start = 1
     # for i_start = 1:Nt_FR_hour*hours_moving:(Nt_FR-Nt_FR_hour)
-        i_start = 1
+        
 
         i_end = i_start + Nt_FR_hour * hours_moving
         i_start_hour = Int(floor(TIME_FR[i_start] / 3600)) + 1
         i_end_hour = i_start_hour + hours_moving - 1
 
-        #region()#*Creating name string for .jld file : filename
+        #region#*Creating name string for .jld file : filename
         if method == "FP_MPC"
             filename = string(
                 "Result/FP_MPC/Min",
@@ -517,11 +541,11 @@ method = "sim_MPC"
             filename = string("Result/Heuristic/Min", soc_min, "C", C, ".jld")
         end
         
-        #endregion() 
+        #endregion
         filename
 
 
-        #region()#*Saving 1 year worth results to file ?
+        #region#*Saving 1 year worth results to file ?
         if TIME_FR[i_start] >= year * 3600 * 24 * 365
             save(
                 filename,
@@ -558,7 +582,7 @@ method = "sim_MPC"
             P_FR[:] = 0
             waste_list[:] = 0
         end
-        #endregion()
+        #endregion
 
 
         du0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
@@ -568,6 +592,7 @@ method = "sim_MPC"
         csn_avg = u0[Ncp+1]
         soc = csn_avg / csnmax
         
+        #region#*Saving data to file if Cf gets to above limit
         if capacity_remain <= soc_retire
             retire_time = TIME_FR[i_start]
             retire_index = i_start
@@ -602,13 +627,18 @@ method = "sim_MPC"
                 "waste_list",
                 waste_list,
             )
-            break
+            #todo: add break back when closing for loop
+            # break
         end
+        #endregion
 
+##
         soc_stop = true
+
+        #region#*Solve OCP 
         if method       == "MPC_flexible"
-            FR_band, grid_band, waste =
-                OptimalControl(u0, TIME_FR[i_start], soc_min, soc_max)
+            FR_band, grid_band, waste   = OptimalControl(u0, TIME_FR[i_start], soc_min, soc_max)
+        
         elseif method   == "Heuristic"
             FR_band = FR_band0 * capacity_remain
             power_next = P_nominal * soc + FR_band * mean(signal[i_start:i_end])
@@ -633,19 +663,27 @@ method = "sim_MPC"
             end
             println("FR_band    ", FR_band, "   grid_band  ", grid_band)
         else
-            FR_band, grid_band = OptimalControl(u0, TIME_FR[i_start], soc_min, soc_max)
+            #Solve OCP for Sim_MPC and others
+            FR_band, grid_band          = OptimalControl(u0, TIME_FR[i_start], soc_min, soc_max)
         end
+        #endregion
+        FR_band, grid_band
+
 
         trial = 0
-        while soc_stop
+        #todo - while loop disabled
+        # while soc_stop
             trial += 1
             TIME_FR_segment = TIME_FR[i_start:i_end]
+
+            #Calculating the Charge/ Discharge rate of battery (for the 1 hour)
             if method == "MPC_flexible"
                 P_FR_segment = signal[i_start:i_end] * FR_band + grid_band - waste
             else
-                P_FR_segment = signal[i_start:i_end] * FR_band + grid_band
+                P_FR_segment = signal[i_start:i_end] * FR_band .+ grid_band
             end
 
+            #chacking if feasible
             band_too_large = false
             level = soc
             for k = 1:(i_end-i_start)
@@ -655,6 +693,8 @@ method = "sim_MPC"
                     break
                 end
             end
+            
+            #corrections to profile if infeasible
             if band_too_large
                 if FR_band >= P_nominal
                     FR_band = FR_band - P_nominal / 2
@@ -662,6 +702,7 @@ method = "sim_MPC"
                     FR_band = FR_band / 2
                 end
                 power_next = P_nominal * soc + FR_band * mean(signal[i_start:i_end])
+                
                 if power_next <= P_nominal * capacity_remain * soc_min
                     grid_band = P_nominal * capacity_remain * soc_min - power_next
                 elseif power_next >= P_nominal * capacity_remain * soc_max
@@ -669,6 +710,7 @@ method = "sim_MPC"
                 else
                     grid_band = 0
                 end
+                
                 if method == "MPC_flexible"
                     if grid_band >= 0
                         waste[1:end] = 0
@@ -684,7 +726,8 @@ method = "sim_MPC"
                     "   grid_band to  ",
                     grid_band,
                 )
-                continue
+                #todo-disabled continue
+                # continue
             end
 
             tspan = (float(TIME_FR_segment[1]), float(TIME_FR_segment[end]))
@@ -695,6 +738,7 @@ method = "sim_MPC"
                 "    ",
                 TIME_FR_segment[end] / 3600 / 24,
             )
+            
             itp = interpolate((TIME_FR_segment,), P_FR_segment, Gridded(Linear()))
 
 
@@ -728,12 +772,15 @@ method = "sim_MPC"
                     iint = u[Ncp+Ncn+1]
                     it = iint
                 end
+                
                 phi_p = u[Ncp+Ncn+2]
                 phi_n = u[Ncp+Ncn+3]
                 p = [p_to_battery]
+                
                 f_common(out, du, u, p, t)
                 out[end] = (phi_p - phi_n) * it - p_to_battery
             end
+
 
             ### modify algerbric variables
             csp_avg0 = u0[1]
@@ -754,9 +801,11 @@ method = "sim_MPC"
                 "     ",
                 P_FR_segment[1],
             )
+
             csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0 =
                 getinitial(csp_avg0, csn_avg0, delta_sei0, P_FR_segment[1], 3)
-            println(
+            
+                println(
                 "csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0  ",
                 csp_s0,
                 "     ",
@@ -774,6 +823,8 @@ method = "sim_MPC"
                 "     ",
                 isei0,
             )
+            
+            #initial guesses for diff states in simulator? 
             u0[Ncp] = csp_s0
             u0[Ncp+Ncn] = csn_s0
             u0[Ncp+Ncn+1] = iint0                  # iint
@@ -792,8 +843,10 @@ method = "sim_MPC"
             csn_avg = (sol[end])[Ncp+1]
             soc_end = csn_avg / csnmax
 
-            #*If simulation is infeasible
+            plot(sol)
+            
             if sol.t[end] != tspan[end] || soc_end <= 0.1 || soc_end >= 0.9
+                #region#*Adjustments If simulation is infeasible
                 println("soc too large or small, stop at   ", sol.t[end])
                 if FR_band >= P_nominal
                     FR_band = FR_band - P_nominal / 2
@@ -830,11 +883,14 @@ method = "sim_MPC"
                         grid_band = 0
                     end
                 end
+                #endregion
+
             else
+                #region#*Saving to lists
                 states = sol(TIME_FR_segment)
-                FR_band_list[i_start_hour:i_end_hour] = FR_band
-                buy_from_grid[i_start_hour:i_end_hour] = grid_band
-                capacity_remain_list[i_start_hour:i_end_hour] = capacity_remain
+                FR_band_list[i_start_hour:i_end_hour] .= FR_band
+                buy_from_grid[i_start_hour:i_end_hour] .= grid_band
+                capacity_remain_list[i_start_hour:i_end_hour] .= capacity_remain
 
                 i_start_this = i_start - Nt_FR_year * (year - 1)
                 i_end_this = i_end - Nt_FR_year * (year - 1)
@@ -851,6 +907,8 @@ method = "sim_MPC"
                 if method == "MPC_flexible"
                     waste_list[i_start_this:i_end_this] = waste
                 end
+                #endregion
+
                 u0 = sol[end]
                 soc_stop = false
             end

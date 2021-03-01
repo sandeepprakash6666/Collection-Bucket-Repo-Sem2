@@ -4,11 +4,13 @@ using Interpolations
 using Distributions
 using JuMP
 using Ipopt
-using Gurobi
+# using Gurobi
 using JLD
-include("setup.jl")
 
+#todo: include commented
+# include("setup.jl")
 
+##
 
 nHours_Horizon = 1
 function OptimalControl(u0, t_start, soc_min, soc_max)
@@ -37,7 +39,9 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
     mTIMEG = 2:Nt                                      # set of temporal grid points except 1
 
 
-    m = Model(solver = GurobiSolver(OutputFlag = 0))
+    #todo: Switched from Gurobi to Ipopt
+    # m = Model(solver = GurobiSolver(OutputFlag = 0))
+    m = Model(with_optimizer(Ipopt.Optimizer, linear_solver = "ma97"))
 
     @variable(m, 0 <= FR_band[h in 1:nHours_Horizon] <= P_nominal * maxC)                                                     # kw
     @variable(
@@ -77,14 +81,19 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
     @variable(m, 0 <= buy_from_grid_plus[h in 1:nHours_Horizon] <= P_nominal * maxC)
 
     @constraint(m, [h in 1:nHours_Horizon], buy_from_grid_plus[h] >= buy_from_grid[h])
+    
     @objective(
         m,
-        :Min,
+        Min,
         -sum(FR_band[h] * FR_price[nHours_start+h] for h = 1:nHours_Horizon) +
         sum(buy_from_grid_plus[h] * grid_price[nHours_start+h] for h = 1:nHours_Horizon)
     )
 
-    status = JuMP.solve(m)
+    # status = JuMP.solve(m)
+    JuMP.optimize!(m)
+    status = JuMP.termination_status(m)
+
+
 
     println("FR_price:  ", FR_price[nHours_start+1])
     println("FR_band:  ", getvalue(FR_band[1]))
@@ -92,11 +101,14 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
     println("revenue   ", FR_price[nHours_start+1] * getvalue(FR_band[1]))
     println("cost      ", getvalue(buy_from_grid_plus[1]) * grid_price[nHours_start+1])
 
-    FR_band = getvalue(FR_band)[1]
-    grid_band = getvalue(buy_from_grid)[1]
+    # FR_band = getvalue(FR_band)[1]
+    # grid_band = getvalue(buy_from_grid)[1]
+    FR_band = JuMP.value.(FR_band)[1]
+    grid_band = JuMP.value.(buy_from_grid)[1]
 
     if status != :Optimal
         FR_band = 3 * P_nominal
+        
         power_next =
             P_nominal * soc0 +
             FR_band * mean(signal[Nt_FR_start+1:Nt_FR_start+Nt_FR_Horizon])
@@ -115,4 +127,5 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
 end
 
 
-MPC(u0, "sim_MPC")
+#todo: MPC call commented
+# MPC(u0, "sim_MPC")
