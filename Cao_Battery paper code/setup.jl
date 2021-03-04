@@ -741,26 +741,32 @@ method = "sim_MPC"
             
             itp = interpolate((TIME_FR_segment,), P_FR_segment, Gridded(Linear()))
 
+            #region#*Callback conditions for the integrator
 
-            function stop_cond(u, t, integrator)
-                csn_avg = u[Ncp+1]
-                soc_in = csn_avg / csnmax
-                min_stop = capacity_remain * soc_min_stop
-                max_stop = capacity_remain * soc_max_stop
+                #*callback condition in integrator.
+                #Callback initiated when the return condition hits zero
+                function stop_cond(u, t, integrator)
+                    csn_avg = u[Ncp+1]
+                    soc_in = csn_avg / csnmax
+                    min_stop = capacity_remain * soc_min_stop
+                    max_stop = capacity_remain * soc_max_stop
 
-                if t <= 50
-                    return (min_stop + max_stop) / 2
+                    if t <= 50
+                        return (min_stop + max_stop) / 2
+                    end
+
+                    if soc_in >= (min_stop + max_stop) / 2
+                        return (max_stop - soc_in)
+                    else
+                        return (soc_in - min_stop)
+                    end
                 end
 
-                if soc_in >= (min_stop + max_stop) / 2
-                    return (max_stop - soc_in)
-                else
-                    return (soc_in - min_stop)
-                end
-            end
+                #*The affect when callback initiated 
+                affect!(integrator) = terminate!(integrator)
+                cb = ContinuousCallback(stop_cond, affect!, rootfind = true, interp_points = 100)
 
-            affect!(integrator) = terminate!(integrator)
-            cb = ContinuousCallback(stop_cond, affect!, rootfind = true, interp_points = 100)
+            #endregion
 
 
             function f_FR(out, du, u, param, t)
@@ -805,7 +811,7 @@ method = "sim_MPC"
             csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0 =
                 getinitial(csp_avg0, csn_avg0, delta_sei0, P_FR_segment[1], 3)
             
-                println(
+            println(
                 "csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0  ",
                 csp_s0,
                 "     ",
@@ -825,12 +831,12 @@ method = "sim_MPC"
             )
             
             #initial guesses for diff states in simulator? 
-            u0[Ncp] = csp_s0
-            u0[Ncp+Ncn] = csn_s0
-            u0[Ncp+Ncn+1] = iint0                  # iint
-            u0[Ncp+Ncn+2] = phi_p0                 # phi_p
-            u0[Ncp+Ncn+3] = phi_n0                 # phi_n
-            u0[Ncp+Ncn+4] = pot0                   # pot
+            u0[Ncp]         = csp_s0
+            u0[Ncp+Ncn]     = csn_s0
+            u0[Ncp+Ncn+1]   = iint0                  # iint
+            u0[Ncp+Ncn+2]   = phi_p0                 # phi_p
+            u0[Ncp+Ncn+3]   = phi_n0                 # phi_n
+            u0[Ncp+Ncn+4]   = pot0                   # pot
             if Sei
                 u0[Ncp+Ncn+5] = it0                     # it
                 u0[Ncp+Ncn+6] = isei0                   # isei
