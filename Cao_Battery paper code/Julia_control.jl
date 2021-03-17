@@ -174,7 +174,7 @@ function condition(u,t,integrator)
     const tstop3 = [15.]
 
     #1st callback break
-    save_positions = (true,true,true)               #?Ask evren details
+    save_positions = (true,true)               #?Ask evren details
     function condition(u,t,integrator)
         t in tstop1
     end
@@ -185,7 +185,7 @@ function condition(u,t,integrator)
 cb = DiscreteCallback(condition, affect!, save_positions=save_positions)
 
 
-    save_positions = (false,true,true)
+    save_positions = (true,true)
     function condition2(u,t,integrator)
         t in tstop2
     end
@@ -195,7 +195,7 @@ cb = DiscreteCallback(condition, affect!, save_positions=save_positions)
 cb2 = DiscreteCallback(condition2, affect2!, save_positions=save_positions)
 
 
-    save_positions = (false,false, true)
+    save_positions = (true,true)
     function condition3(u,t,integrator)
         t in tstop3
     end

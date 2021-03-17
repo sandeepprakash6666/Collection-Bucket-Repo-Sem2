@@ -160,8 +160,10 @@ grid_price = repeat(grid_price; outer = [nyears])
 function f_common(out, du, u, p, t)
     value = p[1]
 
+    #Unpacking the big vector
     csp = u[1:Ncp]
     csn = u[Ncp+1:Ncp+Ncn]
+
     csp = max.(1, min.(csp, cspmax - 1))
     csn = max.(1, min.(csn, csnmax - 1))
     csp_avg = csp[1]
@@ -191,6 +193,7 @@ function f_common(out, du, u, p, t)
         end
     end
 
+    
     ff = 1
     # C2. Additional Equaions
     # Positive electrode
