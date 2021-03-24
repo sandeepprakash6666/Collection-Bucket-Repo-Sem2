@@ -4,9 +4,8 @@
 using DelimitedFiles
 using Sundials
 using Plots
+using Statistics
 
-ones(3)
-plot(collect(Float64, 1:2:5), 5*ones(3))
 
 #todo- Remove from here
     nHours_Horizon = 1
@@ -26,14 +25,16 @@ plot(collect(Float64, 1:2:5), 5*ones(3))
     if !Sei
         Nsei = 0
     end
+    Nsei
+    
     Ncum = 0
-    if Cum
+    if Cum              #?
         Ncum += 2
         if Sei
             Ncum += 2
         end
     end
-
+    Ncum
 
     #= 
     B. Parameters
@@ -49,7 +50,8 @@ plot(collect(Float64, 1:2:5), 5*ones(3))
     Kappa[sei]: SEI ionic conductivity (S/m)
     rho[sei]: SEI density (Kg/m3)
     ksei: rate constant of side reaction (C m/s mol)
-    F : Faraday's constant (C/mol) , R : Ideal gas constant (J/K/mol), T : Temperature (K) =#
+    F : Faraday's constant (C/mol) , R : Ideal gas constant (J/K/mol), T : Temperature (K) 
+    =#
 
     F = 96487
     R = 8.3143
@@ -62,39 +64,39 @@ plot(collect(Float64, 1:2:5), 5*ones(3))
     Rsei = 0.01
 
 
-    area = 1  # 0.3108
-    cspmax = 10350
-    csnmax = 29480
-    lp = 6.521e-5
-    lnn = 2.885e-5
-    Rpp = 1.637e-7
-    Rpn = 3.596e-6
-    ce = 1042
-    ep = 1 - 0.52
-    en = 1 - 0.619
-    ap = 3 * ep / Rpp
-    an = 3 * en / Rpn
-    Sp = area * lp * ap
-    Sn = area * lnn * an
-    kp = 1.127e-7 / F
-    kn = 8.696e-7 / F
-    Dn = 8.256e-14
-    Dp = 1.736e-14
-    TC = 2.3 / 0.3108
-    Qmax = TC
+    area    = 1  # 0.3108
+    cspmax  = 10350
+    csnmax  = 29480
+    lp      = 6.521e-5
+    lnn     = 2.885e-5
+    Rpp     = 1.637e-7
+    Rpn     = 3.596e-6
+    ce      = 1042
+    ep      = 1 - 0.52
+    en      = 1 - 0.619
+    ap      = 3 * ep / Rpp
+    an      = 3 * en / Rpn
+    Sp      = area * lp * ap
+    Sn      = area * lnn * an
+    kp      = 1.127e-7 / F
+    kn      = 8.696e-7 / F
+    Dn      = 8.256e-14
+    Dp      = 1.736e-14
+    TC      = 2.3 / 0.3108
+    Qmax    = TC
     P_nominal = TC * 3.1
 
 
     differential_vars = trues(Ncp + Ncn + 4 + Nsei + Ncum)
-    differential_vars[Ncp] = false
-    differential_vars[Ncp+Ncn] = false
-    differential_vars[Ncp+Ncn+1] = false
-    differential_vars[Ncp+Ncn+2] = false
-    differential_vars[Ncp+Ncn+3] = false
-    differential_vars[Ncp+Ncn+4] = false
+    differential_vars[Ncp]              = false
+    differential_vars[Ncp+Ncn]          = false
+    differential_vars[Ncp+Ncn+1]        = false
+    differential_vars[Ncp+Ncn+2]        = false
+    differential_vars[Ncp+Ncn+3]        = false
+    differential_vars[Ncp+Ncn+4]        = false
     if Sei
-        differential_vars[Ncp+Ncn+5] = false
-        differential_vars[Ncp+Ncn+6] = false
+        differential_vars[Ncp+Ncn+5]    = false
+        differential_vars[Ncp+Ncn+6]    = false
     end
     differential_vars
 
@@ -112,72 +114,72 @@ plot(collect(Float64, 1:2:5), 5*ones(3))
 
 ##*Loading Data from Files
 
-    Files = [
-        "FR/01_2017_Dynamic.csv",
-        "FR/02_2017_Dynamic.csv",
-        "FR/03_2017_Dynamic.csv",
-        "FR/04_2017_Dynamic.csv",
-        "FR/05_2017_Dynamic.csv",
-        "FR/06_2017_Dynamic.csv",
-        "FR/07_2017_Dynamic.csv",
-        "FR/08_2017_Dynamic.csv",
-        "FR/09_2017_Dynamic.csv",
-        "FR/10_2017_Dynamic.csv",
-        "FR/11_2017_Dynamic.csv",
-        "FR/12_2017_Dynamic.csv",
-    ]
+        Files = [
+            "FR/01_2017_Dynamic.csv",
+            "FR/02_2017_Dynamic.csv",
+            "FR/03_2017_Dynamic.csv",
+            "FR/04_2017_Dynamic.csv",
+            "FR/05_2017_Dynamic.csv",
+            "FR/06_2017_Dynamic.csv",
+            "FR/07_2017_Dynamic.csv",
+            "FR/08_2017_Dynamic.csv",
+            "FR/09_2017_Dynamic.csv",
+            "FR/10_2017_Dynamic.csv",
+            "FR/11_2017_Dynamic.csv",
+            "FR/12_2017_Dynamic.csv",
+        ]
 
-    signal = []
-    for i = 1:12
-        filename = Files[i]
-        originalsignal = readdlm(filename, ',', Float64)[1:(end-1), :]   # positive means the grid sends power to battery (charging) and negative means grid buys power from battery(discharging).
-        if i == 1
-            signal = vcat(originalsignal...)
-        else
-            signal = [signal; vcat(originalsignal...)]
+        signal = []
+        for i = 1:12
+            filename = Files[i]
+            originalsignal = readdlm(filename, ',', Float64)[1:(end-1), :]   # positive means the grid sends power to battery (charging) and negative means grid buys power from battery(discharging).
+            if i == 1
+                signal = vcat(originalsignal...)
+            else
+                signal = [signal; vcat(originalsignal...)]
+            end
+            if i == 12
+                signal = [signal; originalsignal[end, end]]
+            end
         end
-        if i == 12
-            signal = [signal; originalsignal[end, end]]
-        end
-    end
-    signal
+        signal
 
-signal = min.(max.(signal, -1), 1)
-signal = repeat(signal; outer = [nyears])
-signal = signal[1:Nt_FR]
+    signal = min.(max.(signal, -1), 1)
+    signal = repeat(signal; outer = [nyears])
+    signal = signal[1:Nt_FR]
 
-FR_price = readdlm("FR/FR_Incentive.csv", ',', Float64)
-FR_price = vcat(FR_price'...)
-FR_price = repeat(FR_price; outer = [nyears])
+    FR_price = readdlm("FR/FR_Incentive.csv", ',', Float64)
+    FR_price = vcat(FR_price'...)
+    FR_price = repeat(FR_price; outer = [nyears])
 
-grid_price = readdlm("FR/slow_Price.csv", ',', Float64)
-grid_price = vcat(grid_price'...)
-grid_price = repeat(grid_price; outer = [nyears])
+    grid_price = readdlm("FR/slow_Price.csv", ',', Float64)
+    grid_price = vcat(grid_price'...)
+    grid_price = repeat(grid_price; outer = [nyears])
 
-##? Some function defenitions - Currently Skipped
 
-#*DAE for common part of plant
+##*DAE for common part of plant
 function f_common(out, du, u, p, t)
     value = p[1]
 
-    #Unpacking the big vector
+    #region #*Unpacking the big vector
     csp = u[1:Ncp]
     csn = u[Ncp+1:Ncp+Ncn]
+        csp = max.(1, min.(csp, cspmax - 1))
+        csn = max.(1, min.(csn, csnmax - 1))
+        
+        csp_avg = csp[1]
+        csp_s   = csp[2]
+        csn_avg = csn[1]
+        csn_s   = csn[2]
 
-    csp = max.(1, min.(csp, cspmax - 1))
-    csn = max.(1, min.(csn, csnmax - 1))
-    csp_avg = csp[1]
-    csp_s = csp[2]
-    csn_avg = csn[1]
-    csn_s = csn[2]
+    iint    = u[Ncp+Ncn+1]
+    phi_p   = u[Ncp+Ncn+2]
+    phi_n   = u[Ncp+Ncn+3]
+    pot     = u[Ncp+Ncn+4]
 
-    iint = u[Ncp+Ncn+1]
-    phi_p = u[Ncp+Ncn+2]
-    phi_n = u[Ncp+Ncn+3]
-    pot = u[Ncp+Ncn+4]
     if Sei
-        it = u[Ncp+Ncn+5]
-        isei = u[Ncp+Ncn+6]
+        it        = u[Ncp+Ncn+5]            #?
+        isei      = u[Ncp+Ncn+6]            #?
         delta_sei = u[Ncp+Ncn+7]
     else
         it = iint
@@ -185,91 +187,90 @@ function f_common(out, du, u, p, t)
     end
 
     if Cum
-        cm = u[Ncp+Ncn+5+Nsei]
-        cp = u[Ncp+Ncn+6+Nsei]
+        cm = u[Ncp+Ncn+5+Nsei]              #?
+        cp = u[Ncp+Ncn+6+Nsei]              #?
         if Sei
-            Q = u[Ncp+Ncn+7+Nsei]
-            cf = u[Ncp+Ncn+8+Nsei]
+            Q   = u[Ncp+Ncn+7+Nsei]         #?
+            cf  = u[Ncp+Ncn+8+Nsei]         #?
         end
     end
 
     
     ff = 1
-    # C2. Additional Equaions
-    # Positive electrode
-    theta_p = csp[Ncp] / cspmax
-    Up =
-        7.49983 - 13.7758 * theta_p .^ 0.5 + 21.7683 * theta_p - 12.6985 * theta_p .^ 1.5 +
-        0.0174967 ./ theta_p - 0.41649 * theta_p .^ (-0.5) -
-        0.0161404 * exp.(100 * theta_p - 97.1069) +
-        0.363031 * tanh.(5.89493 * theta_p - 4.21921)
-    jp =
-        2 *
-        kp *
-        ce^(0.5) *
-        (cspmax - csp[Ncp])^(0.5) *
-        csp[Ncp]^(0.5) *
-        sinh(0.5 * F / R / T * (phi_p - Up))
-    out[Ncp+Ncn+1] = (jp - (it / ap / F / lp))
+    #* C2. Additional Equaions
+        #* Positive electrode
+        theta_p = csp[Ncp] / cspmax
+        
+        Up =
+            7.49983 - 13.7758 * theta_p .^ 0.5 + 21.7683 * theta_p - 12.6985 * theta_p .^ 1.5 +
+            0.0174967 ./ theta_p - 0.41649 * theta_p .^ (-0.5) -
+            0.0161404 * exp.(100 * theta_p - 97.1069) +
+            0.363031 * tanh.(5.89493 * theta_p - 4.21921)
+        
+        jp =
+            2 * kp * ce^(0.5) *                             #constants
+            (cspmax - csp[Ncp])^(0.5) * csp[Ncp]^(0.5) *    #iₒ part in AE 3
+            sinh(0.5 * F / R / T * (phi_p - Up))            #η part
+        
+        out[Ncp+Ncn+1] = (jp - (it / ap / F / lp))      #?
 
-    # Negative electrode
-    theta_n = csn[Ncn] / csnmax
-    Un =
-        9.99877 - 9.99961 * theta_n .^ 0.5 - 9.98836 * theta_n +
-        8.2024 * theta_n .^ 1.5 +
-        0.23584 ./ theta_n - 2.03569 * theta_n .^ (-0.5) -
-        1.47266 * exp.(-1.14872 * theta_n + 2.13185) -
-        9.9989 * tanh.(0.60345 * theta_n - 1.58171)
-    jn =
-        2 *
-        kn *
-        ce^(0.5) *
-        (csnmax - csn[Ncn])^(0.5) *
-        csn[Ncn]^(0.5) *
-        sinh(
-            0.5 * F / R / T * (phi_n - Un + (Rsei + delta_sei / Kappa_sei) * it / an / lnn),
-        )
-    out[Ncp+Ncn+2] = (jn + (iint / an / F / lnn))
-    out[Ncp+Ncn+3] = pot - phi_p + phi_n
+        #* Negative electrode
+            theta_n = csn[Ncn] / csnmax
+            
+            Un =
+                9.99877 - 9.99961 * theta_n .^ 0.5 - 9.98836 * theta_n +
+                8.2024 * theta_n .^ 1.5 +
+                0.23584 ./ theta_n - 2.03569 * theta_n .^ (-0.5) -
+                1.47266 * exp.(-1.14872 * theta_n + 2.13185) -
+                9.9989 * tanh.(0.60345 * theta_n - 1.58171)
+            jn =
+                2 *kn *ce^(0.5) *
+                (csnmax - csn[Ncn])^(0.5) * csn[Ncn]^(0.5) *
+                sinh(0.5 * F / R / T * (phi_n - Un + (Rsei + delta_sei / Kappa_sei) * it / an / lnn),
+                    )
+
+        out[Ncp+Ncn+2] = (jn + (iint / an / F / lnn))
+    
+        out[Ncp+Ncn+3] = pot - phi_p + phi_n
     # println(t, "   value   ",value, "     delta_sei  ", delta_sei,  "   it   ",it, "   isei   ",isei, "    phi_n  ", phi_n, "    ",  exp(-0.5*F/R/T*(phi_n - Urefs + it/an/lnn*(delta_sei/Kappa_sei+Rsei))) , "     ", exp(-0.5*F/R/T*(phi_n + it/an/lnn*(delta_sei/Kappa_sei))), "    ",it/an/lnn*(delta_sei/Kappa_sei)  )
 
-    # C1. Governing Equations
-    # Positive electrode
-    out[1] = -3 * jp / Rpp - du[1]
-    out[2] = 5 * (csp_s - csp_avg) + Rpp * jp / Dp
+    #* C1. Governing Equations
+        #* Positive electrode
+        out[1] = -3 * jp / Rpp - du[1]
+        out[2] = 5 * (csp_s - csp_avg) + Rpp * jp / Dp
 
-    # Negative electrode
-    out[Ncp+1] = -3 * jn / Rpn - du[Ncp+1]
-    out[Ncp+2] = 5 * (csn_s - csn_avg) + Rpn * jn / Dn
+        #* Negative electrode
+        out[Ncp+1] = -3 * jn / Rpn - du[Ncp+1]
+        out[Ncp+2] = 5 * (csn_s - csn_avg) + Rpn * jn / Dn
 
-    if Sei
-        # C3. SEI layer Equations
-        out[Ncp+Ncn+4] = -iint + it - isei
-        out[Ncp+Ncn+5] =
-            -isei +
-            an *
-            lnn *
-            ksei *
-            exp(
-                -1 * F / R / T *
-                (phi_n - Urefs + it / an / lnn * (delta_sei / Kappa_sei + Rsei)),
-            )
-        out[Ncp+Ncn+6] = isei * M_sei / F / rho_sei / an / lnn - du[Ncp+Ncn+7]   # d delta_sei/dt
-    end
-
-    # C4. Charge stored
-    if Cum
-        out[Ncp+Ncn+4+Nsei] = iint / 3600 - du[Ncp+Ncn+5+Nsei]       # dcm/dt
-        out[Ncp+Ncn+5+Nsei] = it * pot / 3600 - du[Ncp+Ncn+6+Nsei]       # dcp/dt
+    #* C3. SEI layer Equations
         if Sei
-            out[Ncp+Ncn+6+Nsei] = it / 3600 - du[Ncp+Ncn+7+Nsei]         # dQ/dt
-            out[Ncp+Ncn+7+Nsei] = isei / 3600 - du[Ncp+Ncn+8+Nsei]       # dcf/dt
+            
+            out[Ncp+Ncn+4] = -iint + it - isei      #?
+            out[Ncp+Ncn+5] = -isei 
+                            + an*lnn *ksei *
+                            exp( -1 * F / R / T *
+                                (phi_n - Urefs     + it / an / lnn * (delta_sei / Kappa_sei + Rsei)),
+                                ) 
+            
+            out[Ncp+Ncn+6] = isei * M_sei / F / rho_sei / an / lnn - du[Ncp+Ncn+7]   # d delta_sei/dt
         end
-    end
+
+    #* C4. Charge stored
+        if Cum
+            out[Ncp+Ncn+4+Nsei] = iint     / 3600 - du[Ncp+Ncn+5+Nsei]      # dcm/dt
+            out[Ncp+Ncn+5+Nsei] = it * pot / 3600 - du[Ncp+Ncn+6+Nsei]      # dcp/dt
+            
+            if Sei
+                out[Ncp+Ncn+6+Nsei] = it   / 3600 - du[Ncp+Ncn+7+Nsei]      # dQ/dt
+                out[Ncp+Ncn+7+Nsei] = isei / 3600 - du[Ncp+Ncn+8+Nsei]      # dcf/dt
+            end
+        end
+
+        
 end
 
-
-
+##*Function to get feasible initial Guesses
 function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
 
     # m = Model(solver = IpoptSolver(print_level = 0))
@@ -304,11 +305,13 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
         pot0 = max(min(Up_guess - Un_guess, 3.3), 2.0)
         it0 = value / pot0
     end
-    @variable(m, it, start = it0)
-    @variable(m, iint, start = it0)
+
+    @variable(m, it,    start = it0)
+    @variable(m, iint,  start = it0)
 
     @variable(m, csp_s, start = csp_avg)
     @variable(m, csn_s, start = csn_avg)
+
 
     @constraint(m, 5 * (csp_s - csp_avg) + Rpp * it / F / Dp / ap / lp == 0)
     @constraint(m, 5 * (csn_s - csn_avg) - Rpn * iint / F / Dn / an / lnn == 0)
@@ -324,11 +327,13 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     @variable(m, phi_p, start = Up_guess)
     @variable(m, Un, start = Un_guess)
     @variable(m, phi_n, start = Un_guess)
+    
     @NLconstraint(
         m,
         (cspmax - csp_s)^(0.5) * csp_s^(0.5) * sinh(0.5 * F / R / T * (phi_p - Up)) -
         (it / ap / F / lp / (2 * kp * ce^(0.5))) == 0
     )
+    
     @NLconstraint(
         m,
         (csnmax - csn_s)^(0.5) *
@@ -346,6 +351,7 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
         0.0161404 * exp(100 * theta_p - 97.1069) +
         0.363031 * tanh(5.89493 * theta_p - 4.21921)
     )
+
     @NLconstraint(
         m,
         Un ==
@@ -359,33 +365,23 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     if Sei
         @variable(
             m,
-            isei,
-            start =
-                an *
-                lnn *
-                ksei *
-                exp(
-                    -1 * F / R / T *
-                    (Un_guess - Urefs + delta_sei / Kappa_sei * it0 / an / lnn),
-                )
-        )
+            isei,   start = an *lnn *ksei * exp( -1 * F / R / T *(Un_guess - Urefs + delta_sei / Kappa_sei * it0 / an / lnn),)
+            )
+
         @NLconstraint(
             m,
-            1e4 * (
-                -isei +
-                an *
-                lnn *
-                ksei *
-                exp(
-                    -1 * F / R / T *
-                    (phi_n - Urefs + (delta_sei / Kappa_sei + Rsei) * it / an / lnn),
-                )
-            ) == 0
+            1e4 * (-isei +
+                        an *lnn *ksei *exp( -1 * F / R / T * (phi_n - Urefs + (delta_sei / Kappa_sei + Rsei) * it / an / lnn),
+                                )
+                ) == 0
         )
+
     else
         isei = 0
     end
+
     @constraint(m, -iint + it - isei == 0)
+    
     if mode == 1
         @constraint(m, it == value)
     elseif mode == 2
@@ -393,6 +389,8 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     elseif mode == 3
         @constraint(m, it * (phi_p - phi_n) == value)
     end
+    
+    
     # JuMP.solve(m)
     JuMP.optimize!(m)
     
@@ -410,19 +408,21 @@ end
 
 ##*
 
-V_max = 3.65
-V_min = 2.0
-maxC = 10
-soc_retire = 0.8
-soc_min = 0.5
-soc_max = 0.5
-soc_min_stop = 0.1
-soc_max_stop = 0.9
+    V_max = 3.65
+    V_min = 2.0
+    maxC = 10
+    soc_retire = 0.8
+    soc_min = 0.5
+    soc_max = 0.5
+    soc_min_stop = 0.1
+    soc_max_stop = 0.9
 
+##*Setting Initial Gueeses u0
 soc = 0.5
 csp_avg0 = cspmax * 1 - csnmax * soc * lnn * en / lp / ep            # 49503.111
 csn_avg0 = csnmax * soc
 delta_sei0 = 1e-10
+
 u0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
 
     #!changed to broadcasting here
@@ -430,60 +430,65 @@ u0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
     u0[(Ncp+1):(Ncp+Ncn)] .= csn_avg0
     u0
 
-if Sei
-    u0[Ncp+Ncn+7] = delta_sei0              # delta_sei
-end
-if Cum
-    u0[Ncp+Ncn+Nsei+5] = 0                  # cm
-    u0[Ncp+Ncn+Nsei+6] = 0                  # cp
     if Sei
-        u0[Ncp+Ncn+Nsei+7] = 0              # Q
-        u0[Ncp+Ncn+Nsei+8] = 0              # cf
+        u0[Ncp+Ncn+7] = delta_sei0              # delta_sei
     end
-end
 
-
-##*
-
-#todo: function disabled
-method = "sim_MPC"
-
-# function MPC(u0, method)
-
-    println("MPC start")
+    if Cum
+        u0[Ncp+Ncn+Nsei+5] = 0                  # cm
+        u0[Ncp+Ncn+Nsei+6] = 0                  # cp
         
-        #!changed from tic to start
-        # tic()
-        start = time()
+        if Sei
+            u0[Ncp+Ncn+Nsei+7] = 0              # Q
+            u0[Ncp+Ncn+Nsei+8] = 0              # cf
+        end
+    end
 
-    #region()#*Initializing variables (with zeroes)
-    i_start = 1
-    i_end = 1
-    FR_band_list = zeros(TotalHours)
-    buy_from_grid = zeros(TotalHours)
-    capacity_remain_list = soc_retire * ones(TotalHours)
-    csp_avg_list = zeros(Nt_FR_year + 1)                    #Surface Conc ? 
-    csn_avg_list = zeros(Nt_FR_year + 1)
-    delta_sei_list = zeros(Nt_FR_year + 1)
-    cf_list = zeros(Nt_FR_year + 1)
-    pot_list = zeros(Nt_FR_year + 1)
-    it_list = zeros(Nt_FR_year + 1)
-    isei_list = zeros(Nt_FR_year + 1)
-    delta_sei_list = zeros(Nt_FR_year + 1)
-    Q_list = zeros(Nt_FR_year + 1)
-    P_FR = zeros(Nt_FR_year + 1)
-    waste_list = zeros(Nt_FR_year + 1)
-    retire_time = Totaltime
-    retire_index = Nt_FR
+u0
 
-    TIME_FR_segment = Int64[]
-    P_FR_segment = Float64[]
-    TIME_FR_list = []
-    solt = []
-    solu = []
-    year = 1
-    hours_moving = 1
-    #endregion()
+##*MPC Iterations Section Starts
+
+    #todo: function disabled
+    method = "sim_MPC"
+    # method = "modified_sim_MPC"
+    # function MPC(u0, method)
+
+        println("MPC start")
+            
+            #!changed from tic to start
+            # tic()
+            start = time()
+
+        #region()#*Initializing variables (with zeroes)
+            i_start      = 1
+            i_end        = 1
+            
+            FR_band_list            = zeros(TotalHours)
+            buy_from_grid           = zeros(TotalHours)
+            capacity_remain_list    = soc_retire * ones(TotalHours)
+            csp_avg_list            = zeros(Nt_FR_year + 1)                    #Surface Conc ? 
+            csn_avg_list            = zeros(Nt_FR_year + 1)
+            delta_sei_list          = zeros(Nt_FR_year + 1)
+            cf_list                 = zeros(Nt_FR_year + 1)
+            pot_list                = zeros(Nt_FR_year + 1)
+            it_list                 = zeros(Nt_FR_year + 1)
+            isei_list               = zeros(Nt_FR_year + 1)
+            delta_sei_list          = zeros(Nt_FR_year + 1)
+            Q_list                  = zeros(Nt_FR_year + 1)
+            P_FR                    = zeros(Nt_FR_year + 1)
+            waste_list              = zeros(Nt_FR_year + 1)
+            retire_time             = Totaltime
+            retire_index            = Nt_FR
+
+            TIME_FR_segment = Int64[]
+            P_FR_segment    = Float64[]
+            TIME_FR_list    = []
+            solt            = []
+            solu            = []
+            
+            year            = 1
+            hours_moving    = 1
+        #endregion()
 
 ##
     #todo: for loop disabled
@@ -496,54 +501,54 @@ method = "sim_MPC"
         i_end_hour = i_start_hour + hours_moving - 1
 
         #region#*Creating name string for .jld file : filename
-        if method == "FP_MPC"
-            filename = string(
-                "Result/FP_MPC/Min",
-                soc_min,
-                "MPC",
-                "Horizon",
-                nHours_Horizon,
-                "year",
-                year,
-                ".jld",
-            )
-        elseif method == "sim_MPC"
-            filename = string(
-                "Result/sim_MPC/Min",
-                soc_min,
-                "MPC",
-                "Horizon",
-                nHours_Horizon,
-                "year",
-                year,
-                ".jld",
-            )
-        elseif method == "modified_sim_MPC"
-            filename = string(
-                "Result/modified_sim_MPC/Min",
-                soc_min,
-                "MPC",
-                "Horizon",
-                nHours_Horizon,
-                "year",
-                year,
-                ".jld",
-            )
-        elseif method == "MPC_flexible"
-            filename = string(
-                "Result/flex_MPC/Min",
-                soc_min,
-                "MPC",
-                "Horizon",
-                nHours_Horizon,
-                "year",
-                year,
-                ".jld",
-            )
-        elseif method == "Heuristic"
-            filename = string("Result/Heuristic/Min", soc_min, "C", C, ".jld")
-        end
-        
+            if     method == "FP_MPC"
+                filename = string(
+                    "Result/FP_MPC/Min",
+                    soc_min,
+                    "MPC",
+                    "Horizon",
+                    nHours_Horizon,
+                    "year",
+                    year,
+                    ".jld",
+                )
+            elseif method == "sim_MPC"
+                filename = string(
+                    "Result/sim_MPC/Min",
+                    soc_min,
+                    "MPC",
+                    "Horizon",
+                    nHours_Horizon,
+                    "year",
+                    year,
+                    ".jld",
+                )
+            elseif method == "modified_sim_MPC"
+                filename = string(
+                    "Result/modified_sim_MPC/Min",
+                    soc_min,
+                    "MPC",
+                    "Horizon",
+                    nHours_Horizon,
+                    "year",
+                    year,
+                    ".jld",
+                )
+            elseif method == "MPC_flexible"
+                filename = string(
+                    "Result/flex_MPC/Min",
+                    soc_min,
+                    "MPC",
+                    "Horizon",
+                    nHours_Horizon,
+                    "year",
+                    year,
+                    ".jld",
+                )
+            elseif method == "Heuristic"
+                filename = string("Result/Heuristic/Min", soc_min, "C", C, ".jld")
+            end
+            
         #endregion
         filename
 
@@ -588,61 +593,62 @@ method = "sim_MPC"
         #endregion
 
 
-        du0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
-        cf0 = u0[Ncp+Ncn+Nsei+8]
-        fade = cf0 / Qmax
+        du0     = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
+        cf0     = u0[Ncp+Ncn+Nsei+8]
+        fade    = cf0 / Qmax
+
         capacity_remain = 1 - fade
-        csn_avg = u0[Ncp+1]
-        soc = csn_avg / csnmax
+        csn_avg         = u0[Ncp+1]
+        soc             = csn_avg / csnmax
         
         #region#*Saving data to file if Cf gets to above limit
-        if capacity_remain <= soc_retire
-            retire_time = TIME_FR[i_start]
-            retire_index = i_start
-            save(
-                filename,
-                "retire_time",
-                retire_time,
-                "FR_band_list",
-                FR_band_list,
-                "buy_from_grid",
-                buy_from_grid,
-                "capacity_remain_list",
-                capacity_remain_list,
-                "csp_avg_list",
-                csp_avg_list,
-                "csn_avg_list",
-                csn_avg_list,
-                "delta_sei_list",
-                delta_sei_list,
-                "cf_list",
-                cf_list,
-                "pot_list",
-                pot_list,
-                "it_list",
-                it_list,
-                "isei_list",
-                isei_list,
-                "Q_list",
-                Q_list,
-                "P_FR",
-                P_FR,
-                "waste_list",
-                waste_list,
-            )
-            #todo: add break back when closing for loop
-            # break
-        end
+            if capacity_remain <= soc_retire
+                retire_time = TIME_FR[i_start]
+                retire_index = i_start
+                save(
+                    filename,
+                    "retire_time",
+                    retire_time,
+                    "FR_band_list",
+                    FR_band_list,
+                    "buy_from_grid",
+                    buy_from_grid,
+                    "capacity_remain_list",
+                    capacity_remain_list,
+                    "csp_avg_list",
+                    csp_avg_list,
+                    "csn_avg_list",
+                    csn_avg_list,
+                    "delta_sei_list",
+                    delta_sei_list,
+                    "cf_list",
+                    cf_list,
+                    "pot_list",
+                    pot_list,
+                    "it_list",
+                    it_list,
+                    "isei_list",
+                    isei_list,
+                    "Q_list",
+                    Q_list,
+                    "P_FR",
+                    P_FR,
+                    "waste_list",
+                    waste_list,
+                )
+                #todo: add break back when closing for loop
+                # break
+            end
         #endregion
 
-##
+##*Solving OCP
         soc_stop = true
 
         #region#*Solve OCP 
-        if method       == "MPC_flexible"
+        if      method == "MPC_flexible"
             FR_band, grid_band, waste   = OptimalControl(u0, TIME_FR[i_start], soc_min, soc_max)
         
-        elseif method   == "Heuristic"
+        elseif  method == "Heuristic"
             FR_band = FR_band0 * capacity_remain
             power_next = P_nominal * soc + FR_band * mean(signal[i_start:i_end])
             println(
@@ -673,73 +679,82 @@ method = "sim_MPC"
         FR_band, grid_band
 
 
+
         trial = 0
         #todo - while loop disabled
         # while soc_stop
             trial += 1
             TIME_FR_segment = TIME_FR[i_start:i_end]
 
-            #Calculating the Charge/ Discharge rate of battery (for the 1 hour)
-            if method == "MPC_flexible"
-                P_FR_segment = signal[i_start:i_end] * FR_band + grid_band - waste
-            else
-                P_FR_segment = signal[i_start:i_end] * FR_band .+ grid_band
-            end
-
-            #chacking if feasible
-            band_too_large = false
-            level = soc
-            for k = 1:(i_end-i_start)
-                level += P_FR_segment[k] * dt_FR / 3600 / P_nominal
-                if level <= soc_min_stop || level >= soc_max_stop
-                    band_too_large = true
-                    break
-                end
-            end
-            
-            #corrections to profile if infeasible
-            if band_too_large
-                if FR_band >= P_nominal
-                    FR_band = FR_band - P_nominal / 2
-                else
-                    FR_band = FR_band / 2
-                end
-                power_next = P_nominal * soc + FR_band * mean(signal[i_start:i_end])
-                
-                if power_next <= P_nominal * capacity_remain * soc_min
-                    grid_band = P_nominal * capacity_remain * soc_min - power_next
-                elseif power_next >= P_nominal * capacity_remain * soc_max
-                    grid_band = P_nominal * capacity_remain * soc_max - power_next
-                else
-                    grid_band = 0
-                end
-                
+            #*Calculating the Charge/ Discharge rate of battery (for the 1 hour)
                 if method == "MPC_flexible"
-                    if grid_band >= 0
-                        waste[1:end] = 0
-                    else
-                        waste[1:end] = -grid_band
-                        grid_band = 0
+                    P_FR_segment = signal[i_start:i_end] * FR_band + grid_band - waste
+                else
+                    P_FR_segment = signal[i_start:i_end] * FR_band .+ grid_band
+                end
+                P_FR_segment
+
+                        #! Test point for constant power
+                        P_FR_segment[1:500] .= 20
+                        P_FR_segment[501:1000] .= -20
+                        P_FR_segment[1001:end] .= 0
+                        P_FR_segment
+
+
+            #*chacking if feasible
+                band_too_large = false
+                level = soc
+                for k = 1:(i_end-i_start)
+                    level += P_FR_segment[k] * dt_FR / 3600 / P_nominal
+                    if level <= soc_min_stop || level >= soc_max_stop
+                        band_too_large = true
+                        break
                     end
                 end
+                band_too_large
 
-                println(
-                    "band_too_large, update FR_band to  ",
-                    FR_band,
-                    "   grid_band to  ",
-                    grid_band,
-                )
-                #todo-disabled continue
-                # continue
-            end
+            #*corrections to profile if infeasible
+                if band_too_large
+                    if FR_band >= P_nominal
+                        FR_band = FR_band - P_nominal / 2
+                    else
+                        FR_band = FR_band / 2
+                    end
+                    power_next = P_nominal * soc + FR_band * mean(signal[i_start:i_end])
+                    
+                    if power_next <= P_nominal * capacity_remain * soc_min
+                        grid_band = P_nominal * capacity_remain * soc_min - power_next
+                    elseif power_next >= P_nominal * capacity_remain * soc_max
+                        grid_band = P_nominal * capacity_remain * soc_max - power_next
+                    else
+                        grid_band = 0
+                    end
+                    
+                    if method == "MPC_flexible"
+                        if grid_band >= 0
+                            waste[1:end] = 0
+                        else
+                            waste[1:end] = -grid_band
+                            grid_band = 0
+                        end
+                    end
+
+                    println(
+                        "band_too_large, update FR_band to  ",
+                        FR_band,
+                        "   grid_band to  ",
+                        grid_band,
+                    )
+                    #todo-disabled continue
+                    # continue
+                end
 
             tspan = (float(TIME_FR_segment[1]), float(TIME_FR_segment[end]))
             println("P_FR_segment   ", P_FR_segment[1], "   ", P_FR_segment[end])
-            println(
-                "TIME_FR_segment (day)  ",
-                TIME_FR_segment[1] / 3600 / 24,
-                "    ",
-                TIME_FR_segment[end] / 3600 / 24,
+            println("TIME_FR_segment (day)  ",
+                    TIME_FR_segment[1] / 3600 / 24,
+                    "    ",
+                    TIME_FR_segment[end] / 3600 / 24,
             )
             
             itp = interpolate((TIME_FR_segment,), P_FR_segment, Gridded(Linear()))
@@ -747,23 +762,23 @@ method = "sim_MPC"
             #region#*Callback conditions for the integrator
 
                 #*callback condition in integrator.
-                #Callback initiated when the return condition hits zero
-                function stop_cond(u, t, integrator)
-                    csn_avg = u[Ncp+1]
-                    soc_in = csn_avg / csnmax
-                    min_stop = capacity_remain * soc_min_stop
-                    max_stop = capacity_remain * soc_max_stop
+                    #Callback initiated when the return condition hits zero
+                    function stop_cond(u, t, integrator)
+                        csn_avg = u[Ncp+1]
+                        soc_in = csn_avg / csnmax
+                        min_stop = capacity_remain * soc_min_stop
+                        max_stop = capacity_remain * soc_max_stop
 
-                    if t <= 50
-                        return (min_stop + max_stop) / 2
-                    end
+                        if t <= 50
+                            return (min_stop + max_stop) / 2
+                        end
 
-                    if soc_in >= (min_stop + max_stop) / 2
-                        return (max_stop - soc_in)
-                    else
-                        return (soc_in - min_stop)
+                        if soc_in >= (min_stop + max_stop) / 2
+                            return (max_stop - soc_in)
+                        else
+                            return (soc_in - min_stop)
+                        end
                     end
-                end
 
                 #*The affect when callback initiated 
                 affect!(integrator) = terminate!(integrator)
@@ -790,6 +805,7 @@ method = "sim_MPC"
                 out[end] = (phi_p - phi_n) * it - p_to_battery
             end
 
+##*Get feasible initial algebraic states
 
             ### modify algerbric variables
             csp_avg0 = u0[1]
@@ -833,6 +849,7 @@ method = "sim_MPC"
                 isei0,
             )
             
+##
             #initial guesses for diff states in simulator? 
             u0[Ncp]         = csp_s0
             u0[Ncp+Ncn]     = csn_s0
@@ -844,16 +861,51 @@ method = "sim_MPC"
                 u0[Ncp+Ncn+5] = it0                     # it
                 u0[Ncp+Ncn+6] = isei0                   # isei
             end
+            u0
 
-            ##* Simulate Plant
+##* Simulate Plant
             # println("u02   ", u0)
             prob = DAEProblem(f_FR, du0, u0, tspan, differential_vars = differential_vars)
             sol = DifferentialEquations.solve(prob, IDA(), callback = cb)
             csn_avg = (sol[end])[Ncp+1]
             soc_end = csn_avg / csnmax
 
-            plot(sol)
-            
+##!Plotting everything
+            plotlyjs()
+                N_plot = size(sol.t)[1]
+                
+                [sol.u[i][1] for i in 1:N_plot]
+                p1 = Plots.plot(sol.t,  [sol.u[i][1]  for i in 1:N_plot], label = "csp_avg")
+                p1 = Plots.plot!(sol.t, [sol.u[i][2]  for i in 1:N_plot], label = "csp_s")
+                p1 = Plots.plot!(sol.t, [sol.u[i][3]  for i in 1:N_plot], label = "csn_avg")
+                p1 = Plots.plot!(sol.t, [sol.u[i][4]  for i in 1:N_plot], label = "csn_s")
+                
+                p2 = Plots.plot(sol.t,  [sol.u[i][5]  for i in 1:N_plot], label = "I_int")
+                
+                p3 = Plots.plot(sol.t,  [sol.u[i][6]  for i in 1:N_plot], label = "phi_p")
+                p3 = Plots.plot!(sol.t, [sol.u[i][7]  for i in 1:N_plot], label = "phi_n")
+                p3 = Plots.plot!(sol.t, [sol.u[i][8]  for i in 1:N_plot], label = "V or pot")
+                
+                p2 = Plots.plot!(sol.t, [sol.u[i][9]  for i in 1:N_plot], label = "It")
+                p2 = Plots.plot!(sol.t, [sol.u[i][10] for i in 1:N_plot], label = "Isei")
+                
+                p4 = Plots.plot(sol.t,  [sol.u[i][11] for i in 1:N_plot], label = "delta_sei")
+                
+                p5 = Plots.plot(sol.t,  [sol.u[i][12] for i in 1:N_plot], label = "cm")
+                p5 = Plots.plot!(sol.t, [sol.u[i][13] for i in 1:N_plot], label = "cp")
+                p5 = Plots.plot!(sol.t, [sol.u[i][14] for i in 1:N_plot], label = "Q")
+                
+                p6 = Plots.plot(sol.t,  [sol.u[i][15] for i in 1:N_plot], label = "Cf")
+
+                p1
+                p2
+                p3
+                p4
+                p5
+                p6
+
+
+##
             if sol.t[end] != tspan[end] || soc_end <= 0.1 || soc_end >= 0.9
                 #region#*Adjustments If simulation is infeasible
                 println("soc too large or small, stop at   ", sol.t[end])
@@ -896,26 +948,26 @@ method = "sim_MPC"
 
             else
                 #region#*Saving to lists
-                states = sol(TIME_FR_segment)
-                FR_band_list[i_start_hour:i_end_hour] .= FR_band
-                buy_from_grid[i_start_hour:i_end_hour] .= grid_band
-                capacity_remain_list[i_start_hour:i_end_hour] .= capacity_remain
+                    states = sol(TIME_FR_segment)
+                    FR_band_list[i_start_hour:i_end_hour] .= FR_band
+                    buy_from_grid[i_start_hour:i_end_hour] .= grid_band
+                    capacity_remain_list[i_start_hour:i_end_hour] .= capacity_remain
 
-                i_start_this = i_start - Nt_FR_year * (year - 1)
-                i_end_this = i_end - Nt_FR_year * (year - 1)
-                csp_avg_list[i_start_this:i_end_this] = states[1, :]
-                csn_avg_list[i_start_this:i_end_this] = states[Ncp+1, :]
-                delta_sei_list[i_start_this:i_end_this] = states[Ncp+Ncn+7, :]
-                cf_list[i_start_this:i_end_this] = states[Ncp+Ncn+8+Nsei, :]
+                    i_start_this = i_start - Nt_FR_year * (year - 1)
+                    i_end_this = i_end - Nt_FR_year * (year - 1)
+                    csp_avg_list[i_start_this:i_end_this] = states[1, :]
+                    csn_avg_list[i_start_this:i_end_this] = states[Ncp+1, :]
+                    delta_sei_list[i_start_this:i_end_this] = states[Ncp+Ncn+7, :]
+                    cf_list[i_start_this:i_end_this] = states[Ncp+Ncn+8+Nsei, :]
 
-                pot_list[i_start_this:i_end_this] = states[Ncp+Ncn+4, :]
-                it_list[i_start_this:i_end_this] = states[Ncp+Ncn+5, :]
-                isei_list[i_start_this:i_end_this] = states[Ncp+Ncn+6, :]
-                Q_list[i_start_this:i_end_this] = states[Ncp+Ncn+7+Nsei, :]
-                P_FR[i_start_this:i_end_this] = P_FR_segment
-                if method == "MPC_flexible"
-                    waste_list[i_start_this:i_end_this] = waste
-                end
+                    pot_list[i_start_this:i_end_this] = states[Ncp+Ncn+4, :]
+                    it_list[i_start_this:i_end_this] = states[Ncp+Ncn+5, :]
+                    isei_list[i_start_this:i_end_this] = states[Ncp+Ncn+6, :]
+                    Q_list[i_start_this:i_end_this] = states[Ncp+Ncn+7+Nsei, :]
+                    P_FR[i_start_this:i_end_this] = P_FR_segment
+                    if method == "MPC_flexible"
+                        waste_list[i_start_this:i_end_this] = waste
+                    end
                 #endregion
 
                 u0 = sol[end]

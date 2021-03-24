@@ -4,9 +4,9 @@ using Interpolations
 using Distributions
 using JuMP
 using Ipopt
-using Gurobi
+# using Gurobi
 using JLD
-include("setup.jl")
+# include("setup.jl")
 
 
 nHours_Horizon = 24
@@ -38,8 +38,10 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
     TIMEGm = 1:Nt-1                                # set of temporal grid points minus 1
     mTIMEG = 2:Nt                                  # set of temporal grid points except 1
 
+    #!switched from Gurobi to Ipopt
+    # m = Model(solver = GurobiSolver(OutputFlag = 0))
+    m = Model(with_optimizer(Ipopt.Optimizer))
 
-    m = Model(solver = GurobiSolver(OutputFlag = 0))
     @variable(m, 0 <= FR_band[h in 1:nHours_Horizon] <= P_nominal * maxC)                      # kw
     @variable(
         m,
@@ -72,14 +74,20 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
 
     @variable(m, 0 <= buy_from_grid_plus[h in 1:nHours_Horizon] <= P_nominal * maxC)
     @constraint(m, [h in 1:nHours_Horizon], buy_from_grid_plus[h] >= buy_from_grid[h])
-    @objective(
-        m,
-        :Min,
-        -sum(FR_band[h] * (FR_price[nHours_start+h] - costBand) for h = 1:nHours_Horizon) +
-        sum(buy_from_grid_plus[h] * grid_price[nHours_start+h] for h = 1:nHours_Horizon)
-    )
+    
+    #*Objective
+        @objective(
+            m,
+            Min,
+            -sum(FR_band[h] * (FR_price[nHours_start+h] - costBand) for h = 1:nHours_Horizon) +
+            sum(buy_from_grid_plus[h] * grid_price[nHours_start+h] for h = 1:nHours_Horizon)
+        )
 
-    status = JuMP.solve(m)
+    # status = JuMP.solve(m)
+    JuMP.optimize!(m)
+    status = JuMP.termination_status(m)
+
+    print("Optimization status is", status)
 
     println("FR_price:  ", FR_price[nHours_start+1])
     println("FR_band:  ", getvalue(FR_band[1]))
@@ -87,26 +95,36 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
     println("revenue   ", FR_price[nHours_start+1] * getvalue(FR_band[1]))
     println("cost      ", getvalue(buy_from_grid_plus[1]) * grid_price[nHours_start+1])
 
-    FR_band = getvalue(FR_band)[1]
-    grid_band = getvalue(buy_from_grid)[1]
+    # FR_band = getvalue(FR_band)[1]
+    # grid_band = getvalue(buy_from_grid)[1]
+    FR_band   = JuMP.value.(FR_band)[1]
+    grid_band = JuMP.value.(buy_from_grid)[1]
+
+    
+    #!Error checking commented out
+    #=
     if status != :Optimal
-        FR_band = 3 * P_nominal
-        power_next =
-            P_nominal * soc0 +
-            FR_band * mean(signal[Nt_FR_start+1:Nt_FR_start+Nt_FR_Horizon])
-        if power_next <= P_nominal * capacity_remain * soc_min
-            grid_band =
-                (P_nominal * capacity_remain * soc_min - power_next) / nHours_Horizon
-        elseif power_next >= P_nominal * capacity_remain * soc_max
-            grid_band =
-                (P_nominal * capacity_remain * soc_max - power_next) / nHours_Horizon
+        FR_band     = 3 * P_nominal
+        power_next  = P_nominal * soc0 +    FR_band * mean(signal[Nt_FR_start+1:Nt_FR_start+Nt_FR_Horizon])
+        
+        if      power_next <= P_nominal * capacity_remain * soc_min
+            
+            grid_band = (P_nominal * capacity_remain * soc_min - power_next) / nHours_Horizon
+        
+        elseif  power_next >= P_nominal * capacity_remain * soc_max
+            
+            grid_band = (P_nominal * capacity_remain * soc_max - power_next) / nHours_Horizon
+        
         else
+            
             grid_band = 0
+        
         end
     end
+    =#
 
     return FR_band, grid_band
 end
 
 
-MPC(u0, "modified_sim_MPC")
+# MPC(u0, "modified_sim_MPC")

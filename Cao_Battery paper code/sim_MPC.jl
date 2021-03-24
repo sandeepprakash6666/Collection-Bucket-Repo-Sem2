@@ -41,17 +41,13 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
 
     #todo: Switched from Gurobi to Ipopt
     # m = Model(solver = GurobiSolver(OutputFlag = 0))
-    m = Model(with_optimizer(Ipopt.Optimizer, linear_solver = "ma97"))
+    m = Model(with_optimizer(Ipopt.Optimizer))
 
-    @variable(m, 0 <= FR_band[h in 1:nHours_Horizon] <= P_nominal * maxC)                                                     # kw
-    @variable(
-        m,
-        -P_nominal * maxC <= buy_from_grid[h in 1:nHours_Horizon] <= P_nominal * maxC
-    )                                                     # kw
-    @variable(m, power[i in 1:Nt_FR_Horizon], start = signal[Nt_FR_start+i] * P_nominal * 3)
+    @variable(m, 0                  <= FR_band[h in 1:nHours_Horizon]       <= P_nominal * maxC)                                                     # kw
+    @variable(m,-P_nominal * maxC   <= buy_from_grid[h in 1:nHours_Horizon] <= P_nominal * maxC)                                                     # kw
+    @variable(m,                       power[i in 1:Nt_FR_Horizon]                              , start = signal[Nt_FR_start+i] * P_nominal * 3)
 
-    @constraint(
-        m,
+    @constraint(m,
         [i in 1:Nt_FR_Horizon],
         power[i] ==
         signal[Nt_FR_start+i] * FR_band[max(1, Int(ceil(TIME_FR[i] / 3600)))] +
@@ -60,18 +56,17 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
 
 
 
-    @variable(
-        m,
+    @variable(m,
         capacity_remain * soc_min_stop + 0.01 <=
         soc[i in 1:Nt_FR_Horizon] <=
         soc_max_stop * capacity_remain - 0.01
     )
 
-    @constraint(
-        m,
+    @constraint(m,
         [i in 1:Nt_FR_Horizon-1],
         soc[i+1] == soc[i] + power[i] * 2 / 3600 / P_nominal
     )
+    
     @constraint(m, soc[1] == soc0)
     @constraint(m, soc[Nt_FR_Horizon] >= soc_min * capacity_remain)
     @constraint(m, soc[Nt_FR_Horizon] <= soc_max * capacity_remain)
@@ -103,7 +98,7 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
 
     # FR_band = getvalue(FR_band)[1]
     # grid_band = getvalue(buy_from_grid)[1]
-    FR_band = JuMP.value.(FR_band)[1]
+    FR_band   = JuMP.value.(FR_band)[1]
     grid_band = JuMP.value.(buy_from_grid)[1]
 
     if status != :Optimal
