@@ -557,26 +557,27 @@ u0
         if TIME_FR[i_start] >= year * 3600 * 24 * 365
             save(
                 filename,
-                "csp_avg_list",     #Surface Conc +ve
-                csp_avg_list,       
-                "csn_avg_list",     #Surface Conc -ve
-                csn_avg_list,       
-                "delta_sei_list",   #Film thickness
-                delta_sei_list,
-                "cf_list",          #Cumulative Capacity Fade
-                cf_list,
-                "pot_list",         #?
-                pot_list,
-                "it_list",          #?
-                it_list,
-                "isei_list",        #?
-                isei_list,
-                "Q_list",           #?
-                Q_list,
-                "P_FR",             #charge/ discharge rate of battery
-                P_FR,
-            )
+                    "csp_avg_list",     #Surface Conc +ve
+                    csp_avg_list,       
+                    "csn_avg_list",     #Surface Conc -ve
+                    csn_avg_list,       
+                    "delta_sei_list",   #Film thickness
+                    delta_sei_list,
+                    "cf_list",          #Cumulative Capacity Fade
+                    cf_list,
+                    "pot_list",         #?
+                    pot_list,
+                    "it_list",          #?
+                    it_list,
+                    "isei_list",        #?
+                    isei_list,
+                    "Q_list",           #?
+                    Q_list,
+                    "P_FR",             #charge/ discharge rate of battery
+                    P_FR,
+                )
 
+            
             year = year + 1
             csp_avg_list[:] = 0
             csn_avg_list[:] = 0
@@ -601,41 +602,41 @@ u0
         csn_avg         = u0[Ncp+1]
         soc             = csn_avg / csnmax
         
-        #region#*Saving data to file if Cf gets to above limit
+        #region#*Saving data to file if Cf becomes above threshold limit
             if capacity_remain <= soc_retire
                 retire_time = TIME_FR[i_start]
                 retire_index = i_start
                 save(
                     filename,
-                    "retire_time",
-                    retire_time,
-                    "FR_band_list",
-                    FR_band_list,
-                    "buy_from_grid",
-                    buy_from_grid,
-                    "capacity_remain_list",
-                    capacity_remain_list,
-                    "csp_avg_list",
-                    csp_avg_list,
-                    "csn_avg_list",
-                    csn_avg_list,
-                    "delta_sei_list",
-                    delta_sei_list,
-                    "cf_list",
-                    cf_list,
-                    "pot_list",
-                    pot_list,
-                    "it_list",
-                    it_list,
-                    "isei_list",
-                    isei_list,
-                    "Q_list",
-                    Q_list,
-                    "P_FR",
-                    P_FR,
-                    "waste_list",
-                    waste_list,
-                )
+                        "retire_time",
+                        retire_time,
+                        "FR_band_list",
+                        FR_band_list,
+                        "buy_from_grid",
+                        buy_from_grid,
+                        "capacity_remain_list",
+                        capacity_remain_list,
+                        "csp_avg_list",
+                        csp_avg_list,
+                        "csn_avg_list",
+                        csn_avg_list,
+                        "delta_sei_list",
+                        delta_sei_list,
+                        "cf_list",
+                        cf_list,
+                        "pot_list",
+                        pot_list,
+                        "it_list",
+                        it_list,
+                        "isei_list",
+                        isei_list,
+                        "Q_list",
+                        Q_list,
+                        "P_FR",
+                        P_FR,
+                        "waste_list",
+                        waste_list,
+                    )
                 #todo: add break back when closing for loop
                 # break
             end
@@ -695,10 +696,10 @@ u0
                 P_FR_segment
 
                         #! Test point for constant power
-                        P_FR_segment[1:500] .= 20
-                        P_FR_segment[501:1000] .= -20
-                        P_FR_segment[1001:end] .= 0
-                        P_FR_segment
+                        # P_FR_segment[1:500] .= 20
+                        # P_FR_segment[501:1000] .= -20
+                        # P_FR_segment[1001:end] .= 0
+                        # P_FR_segment
 
 
             #*chacking if feasible
@@ -787,7 +788,7 @@ u0
             #endregion
 
 
-            function f_FR(out, du, u, param, t)
+            function f_FR(out, du, u, param, t)     #function for Battery system equations
                 p_to_battery = itp[t]
 
                 if Sei
@@ -849,8 +850,8 @@ u0
                 isei0,
             )
             
-##
-            #initial guesses for diff states in simulator? 
+##* Simulate Plant (for next 1 hour)
+            #Setting feasible initial condition for Integrator 
             u0[Ncp]         = csp_s0
             u0[Ncp+Ncn]     = csn_s0
             u0[Ncp+Ncn+1]   = iint0                  # iint
@@ -863,7 +864,7 @@ u0
             end
             u0
 
-##* Simulate Plant
+
             # println("u02   ", u0)
             prob = DAEProblem(f_FR, du0, u0, tspan, differential_vars = differential_vars)
             sol = DifferentialEquations.solve(prob, IDA(), callback = cb)
@@ -928,6 +929,8 @@ u0
                     "    ",
                     FR_band * mean(signal[i_start:i_end]),
                 )
+
+
                 if power_next <= P_nominal * capacity_remain * soc_min
                     grid_band = P_nominal * capacity_remain * soc_min - power_next
                 elseif power_next >= P_nominal * capacity_remain * soc_max
@@ -947,24 +950,28 @@ u0
                 #endregion
 
             else
-                #region#*Saving to lists
+                #region#*Saving profile from integrator to lists
                     states = sol(TIME_FR_segment)
+
                     FR_band_list[i_start_hour:i_end_hour] .= FR_band
                     buy_from_grid[i_start_hour:i_end_hour] .= grid_band
                     capacity_remain_list[i_start_hour:i_end_hour] .= capacity_remain
-
                     i_start_this = i_start - Nt_FR_year * (year - 1)
                     i_end_this = i_end - Nt_FR_year * (year - 1)
-                    csp_avg_list[i_start_this:i_end_this] = states[1, :]
-                    csn_avg_list[i_start_this:i_end_this] = states[Ncp+1, :]
-                    delta_sei_list[i_start_this:i_end_this] = states[Ncp+Ncn+7, :]
-                    cf_list[i_start_this:i_end_this] = states[Ncp+Ncn+8+Nsei, :]
 
-                    pot_list[i_start_this:i_end_this] = states[Ncp+Ncn+4, :]
-                    it_list[i_start_this:i_end_this] = states[Ncp+Ncn+5, :]
-                    isei_list[i_start_this:i_end_this] = states[Ncp+Ncn+6, :]
-                    Q_list[i_start_this:i_end_this] = states[Ncp+Ncn+7+Nsei, :]
-                    P_FR[i_start_this:i_end_this] = P_FR_segment
+                    P_FR[i_start_this:i_end_this]           = P_FR_segment
+
+                    csp_avg_list[i_start_this:i_end_this]   = states[1, :]
+                    csn_avg_list[i_start_this:i_end_this]   = states[Ncp+1, :]
+                    pot_list[i_start_this:i_end_this]       = states[Ncp+Ncn+4, :]
+                    it_list[i_start_this:i_end_this]        = states[Ncp+Ncn+5, :]
+                    isei_list[i_start_this:i_end_this]      = states[Ncp+Ncn+6, :]
+                    delta_sei_list[i_start_this:i_end_this] = states[Ncp+Ncn+7, :]
+
+                    Q_list[i_start_this:i_end_this]         = states[Ncp+Ncn+7+Nsei, :]
+                    cf_list[i_start_this:i_end_this]        = states[Ncp+Ncn+8+Nsei, :]
+
+                    
                     if method == "MPC_flexible"
                         waste_list[i_start_this:i_end_this] = waste
                     end
@@ -974,7 +981,7 @@ u0
                 soc_stop = false
             end
 
-        end
+        end         # while soc_stop (?)
 
 
         cf = u0[Ncp+Ncn+Nsei+8]
@@ -991,7 +998,8 @@ u0
             "    soc     ",
             soc,
         )
-    end
+
+    end 
 
         #!changed from toc to time()
         # println("elapsed time:     ", toc())
