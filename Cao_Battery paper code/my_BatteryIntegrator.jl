@@ -4,10 +4,15 @@ using Ipopt
 using JuMP
 using Interpolations
 using Sundials
+using Plots
 
 ##*Parameters
+
     @with_kw struct BatteryParam
 
+
+
+        
         # A. Number of node points
         N1 = 20     #?
         N2 = 20     #?
@@ -87,7 +92,6 @@ using Sundials
         differential_vars[Ncp+Ncn+4]        = false
         differential_vars[Ncp+Ncn+5]        = false
         differential_vars[Ncp+Ncn+6]        = false
-
     differential_vars
 
     #*Initial Differential state of Battery
@@ -96,7 +100,8 @@ using Sundials
         csn_avg0 = csnmax * soc
      delta_sei0 = 1e-10
 
-        u0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
+        u0 = zeros(Ncp  + Ncn + 4 + Nsei + Ncum)
+        du0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
         u0[1:Ncp]               .= csp_avg0
         u0[(Ncp+1):(Ncp+Ncn)]   .= csn_avg0
         u0[Ncp+Ncn + 7]         = delta_sei0    # delta_sei
@@ -105,14 +110,21 @@ using Sundials
         u0[Ncp+Ncn + 10]        = 0             # Q
         u0[Ncp+Ncn + 11]        = 0             # cf
     u0
+    du0
 
-    tspan = (0, 1*3600)
-    power_to_battery0 = -36
-    P_FR_segment = vcat(power_to_battery0*ones(901), -1.2*ones(900))
-    TIME_FR_segment = 0:2:3600
-        
-        #Linear Interpolation for parameter profile
-        itp = interpolate((TIME_FR_segment,), P_FR_segment, Gridded(Linear()))
+    #todo Time and Power Profile Change Manually 
+    tspan = (0.0, 1*3600.0)
+    TIME_FR_segment = 0:2:tspan[2]
+    
+    P_FR_segment            = NaN*ones(1801)
+    P_FR_segment[1:600]     .= 20
+    P_FR_segment[601:1200]  .= -20
+    P_FR_segment[1201:end]  .= 0
+    P_FR_segment
+
+     #Linear Interpolation for parameter profile
+     itp = interpolate((TIME_FR_segment,), P_FR_segment, Gridded(Linear()))
+
 
 ##*DAE Function for Battery Electrochemistry Equations
 function f_common(out, du, u, p, t)
@@ -164,13 +176,13 @@ function f_common(out, du, u, p, t)
             theta_n = csn_s/csnmax
 
             Un = 9.99877 - 9.99961 * theta_n .^ 0.5 - 9.98836 * theta_n + 8.2024 * theta_n .^ 1.5 +
-                 0.23584 ./ theta_n - 2.03569 * theta_n .^ (-0.5) -
-                 1.47266 * exp.(-1.14872 * theta_n + 2.13185) -
-                 9.9989  * tanh.(0.60345 * theta_n - 1.58171)
+                0.23584 ./ theta_n - 2.03569 * theta_n .^ (-0.5) -
+                1.47266 * exp.(-1.14872 * theta_n + 2.13185) -
+                9.9989  * tanh.(0.60345 * theta_n - 1.58171)
 
             jn = 2 *kn *ce^(0.5) *
-                 (csnmax - csn[Ncn])^(0.5) * csn[Ncn]^(0.5) *
-                 sinh(0.5 * F / R / T * (phi_n - Un + (Rsei + delta_sei / Kappa_sei) * it / an / lnn))
+                (csnmax - csn[Ncn])^(0.5) * csn[Ncn]^(0.5) *
+                sinh(0.5 * F / R / T * (phi_n - Un + (Rsei + delta_sei / Kappa_sei) * it / an / lnn))
 
     #*C1.Governing Equations 
         #Positive 
@@ -189,7 +201,7 @@ function f_common(out, du, u, p, t)
     #*C3.SEI Layer Equations
         out[Ncp+Ncn+4] = - iint + it - isei      #?
         out[Ncp+Ncn+5] = - isei 
-                         + an*lnn *ksei*exp( -1 * F / R / T * 
+                        + an*lnn *ksei*exp( -1 * F / R / T * 
                                                 (phi_n - Urefs  + it / an / lnn * (delta_sei / Kappa_sei + Rsei)))
         
         out[Ncp+Ncn+6] = isei * M_sei / F / rho_sei / an / lnn - du[Ncp+Ncn+7]   # d delta_sei/dt
@@ -206,9 +218,9 @@ end
 function getinitial(csp_avg, csn_avg, delta_sei, power)
     #Some default values for debugging
         # csp_avg   = 5173.778657414506
-        # csn_avg   = 5173.778657414506
+        # csn_avg   = 14740.0
         # delta_sei = 1.0e-10
-        # power     = 1  
+        # power     = 20.0
 
     #Calculating Initial Guesses for variables
         theta_p_guess = min(0.9, csp_avg / cspmax)
@@ -250,8 +262,8 @@ function getinitial(csp_avg, csn_avg, delta_sei, power)
         @variable(m,        Up,                 start = Up_guess)
         @variable(m,        Un,                 start = Un_guess)
 
-
      #Constraints
+
         #Intermediate Variables
             @constraint(m, theta_p * cspmax == csp_s)
             @constraint(m, theta_n * csnmax == csn_s)
@@ -259,13 +271,22 @@ function getinitial(csp_avg, csn_avg, delta_sei, power)
             @NLconstraint(m, Up == 7.49983 - 13.7758 * theta_p^0.5 + 21.7683 * theta_p - 12.6985 * theta_p^1.5 +
                                    0.0174967 / theta_p - 0.41649 * theta_p^(-0.5) -
                                    0.0161404 * exp(100 * theta_p - 97.1069) +
-                                   0.363031  * tanh(5.89493 * theta_p - 4.21921))
+                                   0.363031  * tanh(5.89493 * theta_p - 4.21921)
+                        )
 
             @NLconstraint(m, Un == 9.99877 - 9.99961 * theta_n^0.5 - 9.98836 * theta_n + 8.2024 * theta_n^1.5 +
                                    0.23584 / theta_n - 2.03569 * theta_n^(-0.5) -
                                    1.47266 * exp(-1.14872 * theta_n + 2.13185) -
                                    9.9989 * tanh(0.60345 * theta_n - 1.58171)
-        )
+                        )
+
+            @NLconstraint(m, (cspmax - csp_s)^(0.5) * csp_s^(0.5) * sinh(0.5 * F / R / T * (phi_p - Up)) - 
+                              (it / ap / F / lp / (2 * kp * ce^(0.5))) == 0
+                        )   
+
+            @NLconstraint(m, (csnmax - csn_s)^(0.5) * csn_s^(0.5) * sinh( 0.5 * F / R / T * (phi_n - Un  + (delta_sei / Kappa_sei + Rsei) * it / an / lnn),) + 
+                              iint / an / F / lnn / (2 * kn * ce^(0.5)) == 0
+                        )
 
         #Governing Equations
             @constraint(m, 5 * (csp_s - csp_avg) + Rpp * it   / F / Dp / ap / lp  == 0)
@@ -295,7 +316,7 @@ function getinitial(csp_avg, csn_avg, delta_sei, power)
 
     return csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0
 
-end     
+end  
 
 ##*DAE Function for Battery System Equations
 function f_FR(out, du, u, param, t)
@@ -307,29 +328,28 @@ function f_FR(out, du, u, param, t)
         # t = 1800.5
 
     #Unpacking variables
-    #  p_to_battery = itp[t]
-    p_to_battery = power_to_battery0
-     phi_p  = u[Ncp+Ncn + 2]
-     phi_n  = u[Ncp+Ncn + 3]
-     it     = u[Ncp+Ncn + 5]
+     p_to_battery = itp[t]
+    # p_to_battery = power_to_battery0
+    phi_p  = u[Ncp+Ncn + 2]
+    phi_n  = u[Ncp+Ncn + 3]
+    it     = u[Ncp+Ncn + 5]
 
     #Electrochemistry Equations
-     f_common(out, du, u, p_to_battery, t)
-     out
+    f_common(out, du, u, p_to_battery, t)
+    out
 
     #Battery System Equations
-     out[end] = (phi_p - phi_n) * it - p_to_battery
+    out[end] = (phi_p - phi_n) * it - p_to_battery
 
 end
-
 
 ##*Simulate Battery using Integrator
     
     #Get feasible algebraic states for the current differential states
     csp_s0, csn_s0, iint0, phi_p0, phi_n0, pot0, it0, isei0 = 
-        getinitial(csp_avg0, csn_avg0, delta_sei0, power_to_battery0)
+        getinitial(csp_avg0, csn_avg0, delta_sei0, P_FR_segment[1])
 
-    #Collecting initial states into vector
+    #Collecting initial algebraic states into vector
         u0[Ncp]         = csp_s0
         u0[Ncp+Ncn]     = csn_s0
         u0[Ncp+Ncn+1]   = iint0                  # iint
@@ -339,62 +359,42 @@ end
         u0[Ncp+Ncn+5]   = it0                     # it
         u0[Ncp+Ncn+6]   = isei0                   # isei
         
-        u0
-        du0     = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
+    u0
 
-                    #region#*Callback conditions for the integrator
+##  
 
-                #*callback condition in integrator.
-                    #Callback initiated when the return condition hits zero
-                    function stop_cond(u, t, integrator)
-                        csn_avg = u[Ncp+1]
-                        soc_in = csn_avg / csnmax
-                        min_stop = capacity_remain * soc_min_stop
-                        max_stop = capacity_remain * soc_max_stop
-
-                        if t <= 50
-                            return (min_stop + max_stop) / 2
-                        end
-
-                        if soc_in >= (min_stop + max_stop) / 2
-                            return (max_stop - soc_in)
-                        else
-                            return (soc_in - min_stop)
-                        end
-                    end
-
-                #*The affect when callback initiated 
-                affect!(integrator) = terminate!(integrator)
-                cb = ContinuousCallback(stop_cond, affect!, rootfind = true, interp_points = 100)
-
-            #endregion
-##
-    u0 = [5173.778657414506, 5174.182747722295, 14740.0, 14623.242342713484, -11.858958415865821, 3.2623503968893774, 0.07599186931790682, 3.1863585275714708, -11.858951583329436, 6.832536386192237e-6, 1.0e-10, 0.0, 0.0, 0.0, 0.0]
     prob = DAEProblem(f_FR, du0, u0, tspan, differential_vars = differential_vars)
-    sol  = DifferentialEquations.solve(prob, IDA(), callback = cb)
+    sol  = DifferentialEquations.solve(prob, IDA())
+
+##*Plotting everything
+    plotlyjs()
+    N_plot = size(sol.t)[1]
+
+    [sol.u[i][1] for i in 1:N_plot]
+    p1 = Plots.plot(sol.t,  [sol.u[i][1]  for i in 1:N_plot], label = "csp_avg")
+    p1 = Plots.plot!(sol.t, [sol.u[i][2]  for i in 1:N_plot], label = "csp_s")
+    p1 = Plots.plot!(sol.t, [sol.u[i][3]  for i in 1:N_plot], label = "csn_avg")
+    p1 = Plots.plot!(sol.t, [sol.u[i][4]  for i in 1:N_plot], label = "csn_s")
+
+    p2 = Plots.plot(sol.t,  [sol.u[i][5]  for i in 1:N_plot], label = "I_int")
+    p2 = Plots.plot!(sol.t, [sol.u[i][6]  for i in 1:N_plot], label = "phi_p")
+    p2 = Plots.plot!(sol.t, [sol.u[i][7]  for i in 1:N_plot], label = "phi_n")
+    p2 = Plots.plot!(sol.t, [sol.u[i][8]  for i in 1:N_plot], label = "V or pot")
+    p2 = Plots.plot!(sol.t, [sol.u[i][9]  for i in 1:N_plot], label = "It")
+    p2 = Plots.plot!(sol.t, [sol.u[i][10] for i in 1:N_plot], label = "Isei")
+
+    p3 = Plots.plot(sol.t,  [sol.u[i][11] for i in 1:N_plot], label = "delta_sei")
+    p3 = Plots.plot!(sol.t, [sol.u[i][15] for i in 1:N_plot], label = "Cf")
 
 
+    p4 = Plots.plot(sol.t,  [sol.u[i][12] for i in 1:N_plot], label = "cm")
+    p4 = Plots.plot!(sol.t, [sol.u[i][13] for i in 1:N_plot], label = "cp")
+    p4 = Plots.plot!(sol.t, [sol.u[i][14] for i in 1:N_plot], label = "Q")
 
 
-##Test DAE
-
-    # function f(out,du,u,p,t)
-    #     out[1] = - 0.04u[1]              + 1e4*u[2]*u[3] - du[1]
-    #     out[2] = + 0.04u[1] - 3e7*u[2]^2 - 1e4*u[2]*u[3] - du[2]
-    #     out[3] = u[1] + u[2] + u[3] - 1.0
-    #   end
-
-    # u₀ = [1.0, 0, 0]
-    # du₀ = [-0.04, 0.04, 0.0]
-    # tspan = (0.0,100000.0)
-
-
-    # using DifferentialEquations
-    # differential_vars = [true,true,false]
-    # prob = DAEProblem(f,du₀,u₀,tspan,differential_vars=differential_vars)
-
-    # using Sundials
-    # sol = DifferentialEquations.solve(prob,IDA())
-
+    p1
 ##
+    p2
+    p3
+    p4
 

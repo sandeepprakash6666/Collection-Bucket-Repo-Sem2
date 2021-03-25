@@ -272,6 +272,13 @@ end
 
 ##*Function to get feasible initial Guesses
 function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
+    #Values for Debugging
+        # csp_avg = 5173.778657414506
+        # csn_avg = 14740.0
+        # delta_sei = 1.0e-10
+        # value = 20.0
+        # mode = 3
+
 
     # m = Model(solver = IpoptSolver(print_level = 0))
     m = Model(with_optimizer(Ipopt.Optimizer))
@@ -305,6 +312,8 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
         pot0 = max(min(Up_guess - Un_guess, 3.3), 2.0)
         it0 = value / pot0
     end
+    pot0
+    it0
 
     @variable(m, it,    start = it0)
     @variable(m, iint,  start = it0)
@@ -394,9 +403,9 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     # JuMP.solve(m)
     JuMP.optimize!(m)
     
-    iint0 = getvalue(iint)
     csp_s0 = getvalue(csp_s)
     csn_s0 = getvalue(csn_s)
+    iint0 = getvalue(iint)
     phi_p0 = getvalue(phi_p)
     phi_n0 = getvalue(phi_n)
     pot0 = phi_p0 - phi_n0
@@ -680,7 +689,7 @@ u0
         FR_band, grid_band
 
 
-
+##
         trial = 0
         #todo - while loop disabled
         # while soc_stop
@@ -696,10 +705,10 @@ u0
                 P_FR_segment
 
                         #! Test point for constant power
-                        # P_FR_segment[1:500] .= 20
-                        # P_FR_segment[501:1000] .= -20
-                        # P_FR_segment[1001:end] .= 0
-                        # P_FR_segment
+                        P_FR_segment[1:500] .= 20
+                        P_FR_segment[501:1000] .= -20
+                        P_FR_segment[1001:end] .= 0
+                        P_FR_segment
 
 
             #*chacking if feasible
