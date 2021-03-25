@@ -323,10 +323,10 @@ function getinitial(csp_avg, csn_avg, delta_sei, value, mode)
     @constraint(m, theta_p * cspmax == csp_s)
     @constraint(m, theta_n * csnmax == csn_s)
 
-    @variable(m, Up, start = Up_guess)
-    @variable(m, phi_p, start = Up_guess)
-    @variable(m, Un, start = Un_guess)
-    @variable(m, phi_n, start = Un_guess)
+    @variable(m, Up,        start = Up_guess)
+    @variable(m, phi_p,     start = Up_guess)
+    @variable(m, Un,        start = Un_guess)
+    @variable(m, phi_n,     start = Un_guess)
     
     @NLconstraint(
         m,
