@@ -100,7 +100,7 @@ using Plots
         csn_avg0 = csnmax * soc
      delta_sei0 = 1e-10
 
-        u0 = zeros(Ncp  + Ncn + 4 + Nsei + Ncum)
+        u0  = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
         du0 = zeros(Ncp + Ncn + 4 + Nsei + Ncum)
         u0[1:Ncp]               .= csp_avg0
         u0[(Ncp+1):(Ncp+Ncn)]   .= csn_avg0
@@ -116,7 +116,7 @@ using Plots
     tspan = (0.0, 1*3600.0)
     TIME_FR_segment = 0:2:tspan[2]
     
-    P_FR_segment            = NaN*ones(1801)
+    P_FR_segment             = NaN*ones(1801)
     P_FR_segment[1:600]     .= 20
     P_FR_segment[601:1200]  .= -20
     P_FR_segment[1201:end]  .= 0
@@ -356,8 +356,8 @@ end
         u0[Ncp+Ncn+2]   = phi_p0                 # phi_p
         u0[Ncp+Ncn+3]   = phi_n0                 # phi_n
         u0[Ncp+Ncn+4]   = pot0                   # pot
-        u0[Ncp+Ncn+5]   = it0                     # it
-        u0[Ncp+Ncn+6]   = isei0                   # isei
+        u0[Ncp+Ncn+5]   = it0                    # it
+        u0[Ncp+Ncn+6]   = isei0                  # isei
         
     u0
 

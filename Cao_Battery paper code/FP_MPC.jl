@@ -38,13 +38,12 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
         solver = IpoptSolver(print_level = 0, linear_solver = "ma27", max_cpu_time = 600.0),
     )       # default linear solver mumps
     @variable(m, 0 <= FR_band[h in 1:nHours_Horizon] <= P_nominal * maxC)                 # kw
-    @variable(
-        m,
+    @variable(m,
         -P_nominal * maxC <= buy_from_grid[h in 1:nHours_Horizon] <= P_nominal * maxC
     )  # kw
     @variable(m, power[i in 1:Nt_FR_Horizon], start = signal[Nt_FR_start+i] * P_nominal * 3)
-    @constraint(
-        m,
+    
+    @constraint(m,
         [i in 1:Nt_FR_Horizon],
         power[i] ==
         signal[Nt_FR_start+i] * FR_band[max(1, Int(ceil(TIME_FR[i] / 3600)))] +

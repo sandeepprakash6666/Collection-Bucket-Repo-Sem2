@@ -79,8 +79,8 @@ function OptimalControl(u0, t_start, soc_min, soc_max)
         @objective(
             m,
             Min,
-            -sum(FR_band[h] * (FR_price[nHours_start+h] - costBand) for h = 1:nHours_Horizon) +
-            sum(buy_from_grid_plus[h] * grid_price[nHours_start+h] for h = 1:nHours_Horizon)
+            -sum(FR_band[h] * (FR_price[nHours_start+h] - costBand)     for h = 1:nHours_Horizon) +
+            sum(buy_from_grid_plus[h] * grid_price[nHours_start+h]      for h = 1:nHours_Horizon)
         )
 
     # status = JuMP.solve(m)
