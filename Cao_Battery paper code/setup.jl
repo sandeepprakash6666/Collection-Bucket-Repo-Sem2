@@ -776,6 +776,7 @@ u0
                     function stop_cond(u, t, integrator)
                         csn_avg = u[Ncp+1]
                         soc_in = csn_avg / csnmax
+
                         min_stop = capacity_remain * soc_min_stop
                         max_stop = capacity_remain * soc_max_stop
 
@@ -788,6 +789,7 @@ u0
                         else
                             return (soc_in - min_stop)
                         end
+                        
                     end
 
                 #*The affect when callback initiated 

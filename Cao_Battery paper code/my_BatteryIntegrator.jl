@@ -117,9 +117,9 @@ using Plots
     TIME_FR_segment = 0:2:tspan[2]
     
     P_FR_segment             = NaN*ones(1801)
-    P_FR_segment[1:600]     .= 20
-    P_FR_segment[601:1200]  .= -20
-    P_FR_segment[1201:end]  .= 0
+    P_FR_segment[1:900]     .= 20
+    P_FR_segment[901:end]  .= -20
+    # P_FR_segment[1201:end]  .= 0
     P_FR_segment
 
      #Linear Interpolation for parameter profile
@@ -398,3 +398,25 @@ end
     p3
     p4
 
+
+
+##
+
+E =  NaN*ones(1801)
+E[1] = 0
+
+for i in 1:1800
+
+    E[i+1] = E[i] + P_FR_segment[i]*2/3600 
+
+end
+
+
+rang
+
+t_plot = collect(range(0, stop = 3600, length = 1801))
+
+plot!(t_plot, E)
+
+E
+P_FR_segment
